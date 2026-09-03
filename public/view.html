@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>出貨車次查詢 (唯讀加總版)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0; padding: 12px 12px 130px 12px; background: #f0f2f5; color: #1a202c;
+    }
+    .header-card { background: #ffffff; padding: 14px 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; }
+    .header-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header-card h1 { margin: 0; font-size: 1.15rem; color: #1a365d; }
+    .badge-readonly { background: #edf2f7; color: #4a5568; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+    .info-line { font-size: 0.88rem; color: #4a5568; line-height: 1.5; }
+    .info-line b { color: #2d3748; }
+    .tool-panel { background: #ffffff; padding: 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 14px; }
+    .tool-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.9rem; }
+    .tool-row input { padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.95rem; }
+    .range-num { width: 55px; text-align: center; }
+    .search-input { flex: 1; }
+    .btn-group { display: flex; gap: 6px; }
+    .btn { flex: 1; padding: 8px 0; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .btn-apply { background: #0052cc; color: #fff; }
+    .btn-neutral { background: #edf2f7; color: #4a5568; }
+    .truck-card {
+      background: #ffffff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 2px solid transparent; display: flex;
+      align-items: center; gap: 12px; user-select: none; -webkit-tap-highlight-color: transparent; transition: all 0.15s ease;
+    }
+    .truck-card.selected { border-color: #0052cc; background-color: #ebf8ff; }
+    .truck-card input[type="checkbox"] { width: 22px; height: 22px; accent-color: #0052cc; pointer-events: none; }
+    .truck-info { flex: 1; }
+    .truck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .truck-no { font-weight: 700; font-size: 0.95rem; color: #0052cc; }
+    .truck-plate { font-size: 1.05rem; font-weight: 700; color: #2d3748; }
+    .truck-driver { font-size: 0.9rem; color: #718096; font-weight: 500; margin-left: 6px; }
+    .truck-detail { font-size: 0.85rem; color: #718096; display: flex; justify-content: space-between; align-items: baseline; }
+    .truck-weight { font-size: 1.1rem; font-weight: 700; color: #1a202c; }
+    .sticky-footer {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; padding: 12px 16px;
+      box-shadow: 0 -3px 12px rgba(0,0,0,0.12); border-top: 1px solid #e2e8f0; z-index: 99;
+    }
+    .footer-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+    .footer-title { font-size: 0.85rem; color: #718096; }
+    .footer-total-all { font-size: 0.88rem; color: #4a5568; }
+    .footer-selected-main { font-size: 1.3rem; font-weight: 800; color: #c53030; }
+    .footer-selected-sub { font-size: 0.82rem; color: #718096; }
+  </style>
+  <script src="api-config.js"></script>
+</head>
+<body>
+
+  <div class="header-card">
+    <div class="header-title-row">
+      <h1>現場出貨過磅</h1>
+      <span class="badge-readonly">手機唯讀模式</span>
+    </div>
+    <div class="info-line">客戶：<b id="infoCustomer">-</b></div>
+    <div class="info-line">工程：<b id="infoProject">-</b></div>
+    <div class="info-line">料別：<b id="infoMaterial">-</b></div>
+  </div>
+
+  <div class="tool-panel">
+    <div class="tool-row">
+      <span>車次：第</span>
+      <input type="number" id="rangeFrom" class="range-num" inputmode="numeric" placeholder="1">
+      <span>車 至 第</span>
+      <input type="number" id="rangeTo" class="range-num" inputmode="numeric" placeholder="7">
+      <span>車</span>
+    </div>
+    <div class="tool-row">
+      <span style="font-size: 0.85rem;">車牌篩選：</span>
+      <input type="text" id="plateFilter" class="search-input" placeholder="輸入數字4碼 (如 0931)" oninput="filterCards()">
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-apply" onclick="selectRange()">套用區間</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(true)">全部勾選</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(false)">取消勾選</button>
+    </div>
+  </div>
+
+  <div id="truckList"></div>
+
+  <div class="sticky-footer">
+    <div class="footer-row">
+      <span class="footer-title">全日總發貨</span>
+      <span class="footer-total-all" id="textAllTotal">0 KG (0.00 T)</span>
+    </div>
+    <div class="footer-row">
+      <div>
+        <span class="footer-title">已勾選加總</span>
+        <span class="footer-selected-sub" id="selectedCount">(0 輛)</span>
+      </div>
+      <div class="footer-selected-main" id="textSelectedTotal">0.00 噸</div>
+    </div>
+    <div style="text-align: right; font-size: 0.8rem; color: #a0aec0;" id="textSelectedKg">0 KG</div>
+  </div>
+
+  <script>
+    let dispatches = [];
+
+    async function fetchData() {
+      try {
+        const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
+        const res = await fetch(url);
+        const result = await res.json();
+        dispatches = result.data || [];
+
+        if (dispatches.length > 0) {
+          document.getElementById('infoCustomer').textContent = dispatches[0].customer || '-';
+          document.getElementById('infoProject').textContent = dispatches[0].project || '-';
+          document.getElementById('infoMaterial').textContent = dispatches[0].material || '-';
+        }
+        renderList();
+      } catch (err) {
+        console.error('資料載入錯誤:', err);
+      }
+    }
+
+    function renderList() {
+      const container = document.getElementById('truckList');
+      container.innerHTML = '';
+      let totalAllKg = 0;
+
+      dispatches.forEach((item, index) => {
+        totalAllKg += item.weight;
+        const card = document.createElement('div');
+        card.className = 'truck-card';
+        card.id = `card-${index}`;
+
+        card.onclick = () => {
+          const cb = card.querySelector('input[type="checkbox"]');
+          cb.checked = !cb.checked;
+          updateCardStyle(card, cb.checked);
+          calculate();
+        };
+
+        card.innerHTML = `
+          <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}">
+          <div class="truck-info">
+            <div class="truck-head">
+              <span class="truck-no">第 ${index + 1} 車</span>
+              <div>
+                <span class="truck-plate">${item.plate}</span>
+                <span class="truck-driver">${item.driver}</span>
+              </div>
+            </div>
+            <div class="truck-detail">
+              <span>出廠 ${item.exit_time}</span>
+              <span class="truck-weight">${item.weight.toLocaleString()} KG</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
+      calculate();
+    }
+
+    function updateCardStyle(card, isChecked) {
+      if (isChecked) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+
+    function calculate() {
+      const checkboxes = document.querySelectorAll('.car-check');
+      let sum = 0, count = 0;
+      checkboxes.forEach((cb) => {
+        if (cb.checked) {
+          sum += Number(cb.dataset.weight);
+          count++;
+        }
+      });
+      document.getElementById('textSelectedTotal').textContent = `${(sum / 1000).toFixed(2)} 噸`;
+      document.getElementById('textSelectedKg').textContent = `${sum.toLocaleString()} KG`;
+      document.getElementById('selectedCount').textContent = `(${count} 輛)`;
+    }
+
+    function selectRange() {
+      const from = parseInt(document.getElementById('rangeFrom').value, 10);
+      const to = parseInt(document.getElementById('rangeTo').value, 10);
+      if (isNaN(from) || isNaN(to) || from > to) return;
+
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const order = idx + 1;
+        const shouldCheck = order >= from && order <= to;
+        cb.checked = shouldCheck;
+        updateCardStyle(document.getElementById(`card-${idx}`), shouldCheck);
+      });
+      calculate();
+    }
+
+    function setSelectAll(status) {
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        if (card.style.display !== 'none') {
+          cb.checked = status;
+          updateCardStyle(card, status);
+        }
+      });
+      calculate();
+    }
+
+    function filterCards() {
+      const keyword = document.getElementById('plateFilter').value.trim().toUpperCase();
+      dispatches.forEach((item, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        const plateClean = item.plate.replace('-', '').toUpperCase();
+        const matches = plateClean.includes(keyword) || item.plate.toUpperCase().includes(keyword);
+        card.style.display = matches ? 'flex' : 'none';
+      });
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>
