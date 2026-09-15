@@ -241,6 +241,7 @@
       <button class="btn-secondary" onclick="applyRangeSelection()">套用選取</button>
       <button class="btn-secondary" onclick="toggleSelectAll(true)">全選</button>
       <button class="btn-secondary" onclick="toggleSelectAll(false)">清除選取</button>
+      <button class="btn-secondary" style="background:#fff5f5; color:#c53030; border: 1px solid #feb2b2; margin-left: auto;" onclick="batchDeleteSelected()">🗑️ 刪除已勾選車次</button>
     </div>
 
     <div class="table-scroll-wrap">
@@ -506,7 +507,7 @@
         runningTotal += r.weight;
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><input type="checkbox" class="row-select" data-weight="${r.weight}" onchange="calculateSelected()"></td>
+          <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
           <td>${idx + 1}</td>
           <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
           <td>${r.driver}</td>
@@ -606,6 +607,33 @@
       } catch (err) {
         // 若雲端刪除失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
+    async function batchDeleteSelected() {
+      const selectedBoxes = Array.from(document.querySelectorAll('.row-select:checked'));
+      if (selectedBoxes.length === 0) {
+        alert("請先勾選欲刪除的車次！");
+        return;
+      }
+
+      const targetIds = selectedBoxes.map(cb => Number(cb.dataset.id)).filter(Boolean);
+      if (!confirm(`確定要一次刪除已勾選的 ${targetIds.length} 筆出貨紀錄嗎？\n(此動作將從 Google 試算表中同步移除)`)) return;
+
+      // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除全部勾選項目
+      const originalRecords = [...currentRecords];
+      const targetIdSet = new Set(targetIds);
+      currentRecords = currentRecords.filter(r => !targetIdSet.has(r.id));
+      renderTable();
+      document.getElementById("apiStatusText").textContent = `正在批次刪除 ${targetIds.length} 筆雲端紀錄...`;
+
+      try {
+        // 背景同步至 Google Apps Script 試算表 (依序刪除各 ID)
+        for (const id of targetIds) {
+          await window.ScaleApi.postAction('deleteDispatch', { id: id });
+        }
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        updateKnownProjects();
+        renderProjectTabs();
+      } catch (err) {
+        alert("批次刪除失敗: " + err.message);
         currentRecords = originalRecords;
         renderTable();
       }
