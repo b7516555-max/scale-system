@@ -104,10 +104,7 @@
 
     async function fetchData() {
       try {
-        const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
-        const res = await fetch(url);
-        const result = await res.json();
-        dispatches = result.data || [];
+        dispatches = await window.ScaleApi.fetchDispatches();
 
         if (dispatches.length > 0) {
           document.getElementById('infoCustomer').textContent = dispatches[0].customer || '-';

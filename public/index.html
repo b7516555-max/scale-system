@@ -220,14 +220,12 @@
 
     async function loadRecords() {
       try {
-        const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
-        const res = await fetch(url);
-        const json = await res.json();
-        currentRecords = json.data || [];
+        currentRecords = await window.ScaleApi.fetchDispatches();
         renderTable();
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
       } catch (err) {
         console.error('讀取失敗:', err);
-        document.getElementById("apiStatusText").textContent = '連線失敗，請檢查 API 網址或網路';
+        document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
       }
     }
 
@@ -302,27 +300,26 @@
         return;
       }
 
-      const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
+      try {
+        await window.ScaleApi.postAction('addDispatch', payload);
         document.getElementById("driver").value = "";
         document.getElementById("plate").value = "";
         document.getElementById("weight").value = "";
         document.getElementById("exit_time").value = "";
-        loadRecords();
+        await loadRecords();
+      } catch (err) {
+        alert("儲存失敗: " + err.message);
       }
     }
 
     async function deleteRecord(id) {
       if (!confirm("確定要刪除此筆出貨紀錄嗎？")) return;
-      const url = window.ScaleApi ? window.ScaleApi.getUrl(`/api/dispatches/${id}`) : `/api/dispatches/${id}`;
-      const res = await fetch(url, { method: 'DELETE' });
-      if (res.ok) loadRecords();
+      try {
+        await window.ScaleApi.postAction('deleteDispatch', { id: id });
+        await loadRecords();
+      } catch (err) {
+        alert("刪除失敗: " + err.message);
+      }
     }
 
     initApiConfig();

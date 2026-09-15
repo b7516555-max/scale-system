@@ -54,7 +54,7 @@
     }
 
     const separator = baseUrl.includes('?') ? '&' : '?';
-    const requestUrl = ${baseUrl}action=getDispatches&_t=;
+    const requestUrl = baseUrl + separator + 'action=getDispatches&_t=' + Date.now();
     
     const res = await fetch(requestUrl, {
       method: 'GET',
@@ -63,7 +63,7 @@
     });
 
     if (!res.ok) {
-      throw new Error(HTTP 錯誤: );
+      throw new Error('HTTP 錯誤: ' + res.status);
     }
     const result = await res.json();
     return result.data || [];
@@ -91,7 +91,7 @@
     });
 
     if (!res.ok) {
-      throw new Error(伺服器錯誤: );
+      throw new Error('伺服器錯誤: ' + res.status);
     }
     const result = await res.json();
     if (!result.success) {
