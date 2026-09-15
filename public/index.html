@@ -1,815 +1,332 @@
-﻿<!DOCTYPE html>
-<html lang=zh-TW>
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-  <meta charset=UTF-8>
-  <meta name=viewport content=width=device-width, initial-scale=1.0>
-  <title>地磅調度出貨管理系統 - 總控工作台</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地磅調度出貨管理系統</title>
   <style>
-    :root {
-      --primary: #0052cc;
-      --primary-hover: #0747a6;
-      --success: #36b37e;
-      --danger: #de350b;
-      --danger-hover: #bf2600;
-      --bg: #f4f5f7;
-      --sidebar-bg: #ffffff;
-      --card-bg: #ffffff;
-      --text-main: #172b4d;
-      --text-muted: #5e6c84;
-      --border: #dfe1e6;
-      --highlight-red: #d32f2f;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text-main);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* 頂部全寬導航條 */
-    header {
-      background: #091e42;
-      color: #fff;
-      padding: 10px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-      z-index: 100;
-      flex-shrink: 0;
-    }
-    .brand-title {
-      font-size: 1.18rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .badge-cloud {
-      background: #0052cc;
-      color: #fff;
-      font-size: 0.72rem;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-    }
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 0.88rem;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.12);
-      font-size: 0.8rem;
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ffab00;
-    }
-    .status-dot.online { background: #36b37e; }
-    .status-dot.offline { background: #de350b; }
-    .btn-header {
-      background: rgba(255,255,255,0.18);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.3);
-      padding: 5px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 0.82rem;
-      transition: all 0.2s;
-    }
-    .btn-header:hover {
-      background: rgba(255,255,255,0.3);
-    }
-
-    /* 主體雙欄滿版佈局 (100% 寬螢幕) */
-    .dashboard-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 54px);
-      overflow: hidden;
-    }
-
-    /* 左側快捷錄入面板 */
-    .sidebar-panel {
-      width: 360px;
-      background: var(--sidebar-bg);
-      border-right: 1px solid var(--border);
-      padding: 20px 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      overflow-y: auto;
-      flex-shrink: 0;
-      box-shadow: 2px 0 6px rgba(0,0,0,0.02);
-    }
-    .section-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--primary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      border-bottom: 2px solid #ebecf0;
-      padding-bottom: 6px;
-      margin-bottom: 12px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      margin-bottom: 12px;
-    }
-    .form-group label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-    .form-control {
-      width: 100%;
-      padding: 8px 11px;
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
-      font-size: 0.92rem;
-      color: var(--text-main);
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .form-control:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.2);
-    }
-
-    /* 車牌自動完成 */
-    .autocomplete-box { position: relative; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px; background: #f0f2f5; color: #1a1a1a; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #0052cc; padding-bottom: 8px; color: #0052cc; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; font-size: 0.95rem; }
+    input:focus { outline: none; border-color: #0052cc; }
+    button { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+    .btn-primary { background: #0052cc; color: white; }
+    .btn-primary:hover { background: #0747a6; }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; text-align: left; }
+    th, td { padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 0.95rem; }
+    th { background: #f7fafc; color: #4a5568; }
+    .summary-bar { background: #ebf8ff; border: 1px solid #bee3f8; padding: 14px 20px; border-radius: 6px; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 24px; font-size: 1rem; align-items: center; }
+    .highlight { color: #c53030; font-weight: 700; font-size: 1.15rem; }
+    .range-box { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; }
+    .range-box input { width: 75px; }
+    .del-btn { background: none; border: none; color: #e53e3e; cursor: pointer; font-weight: 600; }
+    .autocomplete-wrap { position: relative; }
     .autocomplete-list {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border: 1.5px solid var(--primary);
-      border-top: none;
-      border-radius: 0 0 6px 6px;
-      max-height: 220px;
-      overflow-y: auto;
-      z-index: 1000;
-      box-shadow: 0 8px 16px rgba(9,30,66,0.15);
+      position: absolute; top: 100%; left: 0; right: 0; background: white;
+      border: 1px solid #cbd5e0; border-top: none; border-radius: 0 0 6px 6px;
+      max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       display: none;
     }
-    .autocomplete-item {
-      padding: 9px 12px;
-      cursor: pointer;
-      font-size: 0.88rem;
-      display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid #f4f5f7;
-    }
-    .autocomplete-item:hover, .autocomplete-item.active {
-      background-color: #deebff;
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    .btn-submit {
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      padding: 12px 16px;
-      border-radius: 6px;
-      font-size: 0.96rem;
-      font-weight: 700;
-      cursor: pointer;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 2px 4px rgba(0,82,204,0.3);
-      transition: background-color 0.2s, transform 0.1s;
-      margin-top: 6px;
-    }
-    .btn-submit:hover { background: var(--primary-hover); }
-    .btn-submit:active { transform: scale(0.99); }
-
-    /* 右側滿版數據展示與加總區 */
-    .main-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg);
-      overflow: hidden;
-      padding: 16px 20px;
-      gap: 14px;
-    }
-
-    /* 頂部工具列 */
-    .toolbar-card {
-      background: #fff;
-      padding: 12px 18px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.05);
-    }
-    .range-selector {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-    .range-selector input {
-      width: 65px;
-      padding: 6px 8px;
-      border: 1.5px solid var(--border);
-      border-radius: 5px;
-      text-align: center;
-      font-size: 0.92rem;
-      font-weight: 600;
-    }
-    .btn-sm {
-      padding: 6px 14px;
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--text-main);
-      border-radius: 5px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-sm:hover { background: #ebecf0; }
-    .btn-sm.btn-primary-sm {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-    .btn-sm.btn-primary-sm:hover { background: var(--primary-hover); }
-
-    /* 表格滾動容器 (滿版 & 固定表頭) */
-    .table-container {
-      flex: 1;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow-y: auto;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.05);
-      position: relative;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.92rem;
-    }
-    thead th {
-      position: sticky;
-      top: 0;
-      background: #fafbfc;
-      color: var(--text-muted);
-      font-weight: 700;
-      padding: 12px 14px;
-      border-bottom: 2px solid var(--border);
-      z-index: 10;
-      white-space: nowrap;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #ebecf0;
-      color: var(--text-main);
-    }
-    tbody tr:hover { background-color: #f7f8f9; }
-    tbody tr.row-checked { background-color: #e6effc !important; }
-    .td-num { font-weight: 700; color: var(--primary); }
-    .td-plate { font-weight: 700; font-size: 0.98rem; }
-    .td-weight { font-weight: 700; }
-    .btn-delete {
-      background: none;
-      border: none;
-      color: var(--danger);
-      font-weight: 600;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-    }
-    .btn-delete:hover { background: #ffebe6; }
-
-    /* 底部即時結算欄 (大字醒目) */
-    .summary-footer {
-      background: #ffffff;
-      border: 1px solid #b3d4ff;
-      border-left: 6px solid var(--primary);
-      border-radius: 8px;
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-      box-shadow: 0 2px 6px rgba(9,30,66,0.08);
-    }
-    .summary-item {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-    }
-    .summary-label {
-      font-size: 0.92rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-    .summary-all {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #091e42;
-    }
-    .summary-selected-container {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      background: #fff0f0;
-      padding: 6px 18px;
-      border-radius: 6px;
-      border: 1px solid #ffbdad;
-    }
-    .summary-selected-tag {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--highlight-red);
-    }
-    .summary-selected-value {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: var(--highlight-red);
-      font-family: 'SF Pro Display', -apple-system, monospace;
-    }
-
-    /* 設定視窗彈窗 */
-    .modal-backdrop {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(9,30,66,0.54);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .modal-box {
-      background: #fff;
-      border-radius: 8px;
-      width: 520px;
-      padding: 24px;
-      box-shadow: 0 12px 24px rgba(9,30,66,0.25);
-    }
-    .modal-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      color: var(--text-main);
-    }
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
+    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.9rem; display: flex; justify-content: space-between; }
+    .autocomplete-item:hover { background-color: #ebf8ff; color: #0052cc; font-weight: 600; }
+    .server-setting-bar { background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
+    .server-setting-bar input { width: 320px; padding: 6px 10px; font-size: 0.85rem; }
+    .badge-cloud { background: #3182ce; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
   </style>
-  <script src=api-config.js></script>
+  <script src="api-config.js"></script>
 </head>
 <body>
 
-  <!-- 頂部滿版導航列 -->
-  <header>
-    <div class=brand-title>
-      <span>⚖️ 地磅調度出貨管理系統</span>
-      <span class=badge-cloud>Google Apps Script 雲端資料庫</span>
+  <div class="server-setting-bar">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span class="badge-cloud">雲端後端</span>
+      <span>API 伺服器：</span>
+      <input type="text" id="apiServerInput" placeholder="本機預設同源，或輸入 https://your-backend.onrender.com">
+      <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="saveApiServer()">儲存設定</button>
     </div>
-    <div class=header-right>
-      <div class=status-badge>
-        <div class=status-dot id=statusDot></div>
-        <span id=statusText>連線中...</span>
-      </div>
-      <button class=btn-header onclick=openSettingsModal()>⚙️ API 與金鑰設定</button>
-      <a href=view.html target=_blank class=btn-header style=text-decoration:none;>📱 開啟手機唯讀版</a>
-    </div>
-  </header>
-
-  <!-- 主工作台 (左右滿版佈局) -->
-  <div class=dashboard-container>
-
-    <!-- 左側快捷錄入面板 (固定寬度) -->
-    <aside class=sidebar-panel>
-      <div>
-        <div class=section-title>🏢 工程項目資訊</div>
-        <div class=form-group>
-          <label>客戶名稱</label>
-          <input type=text id=customer class=form-control value=高雄市政府>
-        </div>
-        <div class=form-group>
-          <label>工程名稱 / 地點</label>
-          <input type=text id=project class=form-control value=苓雅區武慶三路>
-        </div>
-        <div class=form-group>
-          <label>品名 / 料別</label>
-          <input type=text id=material class=form-control value=1/2密集配>
-        </div>
-      </div>
-
-      <div>
-        <div class=section-title>🚛 單車出貨過磅</div>
-        <div class=form-group autocomplete-box>
-          <label>車牌 (輸入 3~4 碼數字模糊比對)</label>
-          <input type=text id=plate class=form-control placeholder=例如輸入 0931, 6663, 116 autocomplete=off>
-          <div id=plateDropdown class=autocomplete-list></div>
-        </div>
-        <div class=form-group>
-          <label>司機姓名</label>
-          <input type=text id=driver class=form-control placeholder=自動帶出或手動輸入>
-        </div>
-        <div class=form-group>
-          <label>實重 (KG)</label>
-          <input type=number id=weight class=form-control placeholder=例如: 44080 step=10>
-        </div>
-        <div class=form-group>
-          <label>出場時間</label>
-          <input type=text id=exit_time class=form-control placeholder=例如: 11:58>
-        </div>
-        <button class=btn-submit id=btnSubmit onclick=submitEntry()>
-          <span>儲存並即時發送</span>
-          <span style=font-size:0.85rem; opacity:0.8;>(Enter)</span>
-        </button>
-      </div>
-    </aside>
-
-    <!-- 右側滿版數據表格與結算面板 -->
-    <main class=main-content>
-      
-      <!-- 區間快選與操作工具列 -->
-      <div class=toolbar-card>
-        <div class=range-selector>
-          <span>⚡ 區間結算：從第</span>
-          <input type=number id=fromIndex min=1 placeholder=1>
-          <span>車 至 第</span>
-          <input type=number id=toIndex min=1 placeholder=8>
-          <span>車</span>
-          <button class=btn-sm btn-primary-sm onclick=applyRangeSelection()>套用選取</button>
-          <button class=btn-sm onclick=toggleSelectAll(true)>全部勾選</button>
-          <button class=btn-sm onclick=toggleSelectAll(false)>清除選取</button>
-        </div>
-        <div>
-          <button class=btn-sm onclick=refreshData()>🔄 重新整理</button>
-        </div>
-      </div>
-
-      <!-- 滿版數據表格容器 (固定 Header) -->
-      <div class=table-container>
-        <table>
-          <thead>
-            <tr>
-              <th width=40><input type=checkbox id=checkAll onchange=toggleSelectAll(this.checked)></th>
-              <th width=65>車次</th>
-              <th>客戶 / 工程 / 料別</th>
-              <th width=120>司機姓名</th>
-              <th width=110>車牌號碼</th>
-              <th width=120>實重 (KG)</th>
-              <th width=130>累計總重 (KG)</th>
-              <th width=100>出場時間</th>
-              <th width=60>操作</th>
-            </tr>
-          </thead>
-          <tbody id=tableBody>
-            <tr><td colspan=9 style=text-align:center; padding: 30px; color:#6b778c;>資料載入中...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 底部即時結算列 (大字紅字醒目) -->
-      <div class=summary-footer>
-        <div class=summary-item>
-          <span class=summary-label>全日累計總發貨：</span>
-          <span class=summary-all id=allTotalDisplay>0 KG (0.00 噸)</span>
-          <span style=font-size: 0.82rem; color: var(--text-muted); margin-left: 8px; id=recordCountDisplay>(共 0 車次)</span>
-        </div>
-        <div class=summary-selected-container>
-          <span class=summary-selected-tag>已勾選結算：</span>
-          <span class=summary-selected-value id=selectedTonDisplay>0.00 噸</span>
-          <span style=font-size: 0.95rem; font-weight:700; color: var(--highlight-red); id=selectedKgDisplay>(0 KG)</span>
-        </div>
-      </div>
-
-    </main>
+    <div style="font-size: 0.8rem; color: #718096;" id="apiStatusText">就緒</div>
   </div>
 
-  <!-- API 與金鑰設定 Modal -->
-  <div class=modal-backdrop id=settingsModal>
-    <div class=modal-box>
-      <div class=modal-title>⚙️ Google Apps Script (GAS) 連線設定</div>
-      <div class=form-group>
-        <label>GAS Web App URL (已發布之網路應用程式網址)</label>
-        <input type=text id=modalApiUrl class=form-control placeholder=https://script.google.com/macros/s/.../exec>
-        <span style=font-size:0.75rem; color:#6b778c; margin-top:4px;>發布時請將存取權限設為「所有人 (Anyone)」</span>
+  <div class="card">
+    <h2>工程項目設定</h2>
+    <div class="grid">
+      <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
+      <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
+      <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>單車次過磅紀錄新增</h2>
+    <div class="grid">
+      <div class="autocomplete-wrap">
+        <label>車牌 (輸入數字4碼快選)</label>
+        <input type="text" id="plate" placeholder="例如輸入 0931 或 6663" autocomplete="off" oninput="onPlateInput(this.value)" onfocus="onPlateInput(this.value)">
+        <div id="plateDropdown" class="autocomplete-list"></div>
       </div>
-      <div class=form-group>
-        <label>管理員密鑰 (Admin Key)</label>
-        <input type=text id=modalAdminKey class=form-control placeholder=SCALE_ADMIN_2026>
-        <span style=font-size:0.75rem; color:#6b778c; margin-top:4px;>需與 Google Apps Script 中設定的 ADMIN_SECRET_KEY 一致</span>
+      <div class="autocomplete-wrap">
+        <label>司機姓名 (點選名單或輸入)</label>
+        <input type="text" id="driver" placeholder="點擊看名單或輸入快選" autocomplete="off" oninput="onDriverInput(this.value)" onfocus="onDriverInput(this.value)">
+        <div id="driverDropdown" class="autocomplete-list"></div>
       </div>
-      <div class=modal-footer>
-        <button class=btn-sm onclick=closeSettingsModal()>取消</button>
-        <button class=btn-sm btn-primary-sm onclick=saveSettings()>儲存並測試連線</button>
-      </div>
+      <div><label>實重 (KG)</label><input type="number" id="weight" placeholder="例如: 44080"></div>
+      <div><label>出場時間</label><input type="text" id="exit_time" placeholder="例如: 11:58"></div>
+    </div>
+    <button class="btn-primary" onclick="submitEntry()">儲存並發送</button>
+  </div>
+
+  <div class="card">
+    <h2>車次清單與區間結算</h2>
+    <div class="range-box">
+      <span>區間計算：從第</span>
+      <input type="number" id="fromIndex" min="1">
+      <span>車 至 第</span>
+      <input type="number" id="toIndex" min="1">
+      <span>車</span>
+      <button class="btn-secondary" onclick="applyRangeSelection()">套用選取</button>
+      <button class="btn-secondary" onclick="toggleSelectAll(true)">全選</button>
+      <button class="btn-secondary" onclick="toggleSelectAll(false)">清除選取</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th width="40"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this.checked)"></th>
+          <th width="60">車次</th>
+          <th>客戶 / 工程 / 料別</th>
+          <th>司機</th>
+          <th>車牌</th>
+          <th>實重 (KG)</th>
+          <th>累計重量 (KG)</th>
+          <th>出場時間</th>
+          <th width="60">操作</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <div class="summary-bar">
+      <div>全部總重：<span id="allTotalKg" style="font-weight: bold;">0</span> KG (<span id="allTotalTon" style="font-weight: bold;">0.00</span> 噸)</div>
+      <div>勾選加總：<span id="selectedKg" class="highlight">0</span> KG (<span id="selectedTon" class="highlight">0.00</span> 噸)</div>
     </div>
   </div>
 
   <script>
-    // 53 輛預設車牌司機資料庫
     const presetVehicles = [
-      { plate: LAP-083, driver: 文造(大車管理) }, { plate: KLH-0723, driver: 豬哥晉 },
-      { plate: KLE-7387, driver: 龍哥 }, { plate: LAP-116, driver: 道友 },
-      { plate: KLH-0612, driver: 150 }, { plate: KLH-0721, driver: 86 },
-      { plate: KLB-7757, driver: 螺雷 }, { plate: KLE-5136, driver: 小白 },
-      { plate: JF-C88, driver: 烏龜 }, { plate: KLE-8819, driver: 小木屋 },
-      { plate: KLF-6505, driver: 阿學 }, { plate: KLF-6018, driver: 國光 },
-      { plate: KLD-8939, driver: 發仔 }, { plate: KLF-6882, driver: 雙管 },
-      { plate: KLH-1367, driver: 大頭 }, { plate: KLK-2755, driver: 高粱 },
-      { plate: KLH-5118, driver: 小劉 }, { plate: KLE-7976, driver: 牛奶 },
-      { plate: KLB-6663, driver: 凍皮/和 }, { plate: KEM-1218, driver: 企鵝(小車管理) },
-      { plate: KLF-6776, driver: 黑龍 }, { plate: 777-G7, driver: 單純 },
-      { plate: KLH-0831, driver: 楊高義 }, { plate: KLH-5295, driver: 阿德 },
-      { plate: KLL-2778, driver: 巴尼 }, { plate: KLK-0757, driver: 黑人 },
-      { plate: KER-9559, driver: 誠阿 }, { plate: KLF-6855, driver: " },
- { plate: KES-9799, driver: 掃把 }, { plate: KEM-0206, driver: 阿傑 },
- { plate: KLF-6085, driver: 閔仔 }, { plate: KLE-7590, driver: 豆腐 },
- { plate: KLH-5111, driver: 小宇 }, { plate: KLH-2828, driver: 架尬 },
- { plate: KLN-1027, driver: 豆花 }, { plate: KLF-6106, driver: 紹興 },
- { plate: KLH-0931, driver: 王進展 }, { plate: KLE-9201, driver: 小書包 },
- { plate: 949-H9, driver: 控肉 }, { plate: KLB-9315, driver: 阿憲 },
- { plate: KLL-2206, driver: 龍 }, { plate: KLH-0585, driver:  },
- { plate: KEP-8398, driver: 燒酒 }, { plate: KEW-2792, driver: 陳平和 },
- { plate: KEH-5955, driver: 泰 }, { plate: KLB-7158, driver:  },
- { plate: KLK-5878, driver: 阿廷 }, { plate: KEM-3076, driver:  },
- { plate: KET-7537, driver: 阿賢 }, { plate: KLM-0929, driver:  },
- { plate: KLE-9550, driver:  }, { plate: KLL-2789, driver:  },
- { plate: KLN-7963, driver:  }
- ];
+      { plate: "LAP-083", driver: "文造(大車管理)" }, { plate: "KLH-0723", driver: "豬哥晉" },
+      { plate: "KLE-7387", driver: "龍哥" }, { plate: "LAP-116", driver: "道友" },
+      { plate: "KLH-0612", driver: "150" }, { plate: "KLH-0721", driver: "86" },
+      { plate: "KLB-7757", driver: "螺雷" }, { plate: "KLE-5136", driver: "小白" },
+      { plate: "JF-C88", driver: "烏龜" }, { plate: "KLE-8819", driver: "小木屋" },
+      { plate: "KLF-6505", driver: "阿學" }, { plate: "KLF-6018", driver: "國光" },
+      { plate: "KLD-8939", driver: "發仔" }, { plate: "KLF-6882", driver: "雙管" },
+      { plate: "KLH-1367", driver: "大頭" }, { plate: "KLK-2755", driver: "高粱" },
+      { plate: "KLH-5118", driver: "小劉" }, { plate: "KLE-7976", driver: "牛奶" },
+      { plate: "KLB-6663", driver: "凍皮/和" }, { plate: "KEM-1218", driver: "企鵝(小車管理)" },
+      { plate: "KLF-6776", driver: "黑龍" }, { plate: "777-G7", driver: "單純" },
+      { plate: "KLH-0831", driver: "楊高義" }, { plate: "KLH-5295", driver: "阿德" },
+      { plate: "KLL-2778", driver: "巴尼" }, { plate: "KLK-0757", driver: "黑人" },
+      { plate: "KER-9559", driver: "誠阿" }, { plate: "KLF-6855", driver: "" },
+      { plate: "KES-9799", driver: "掃把" }, { plate: "KEM-0206", driver: "阿傑" },
+      { plate: "KLF-6085", driver: "閔仔" }, { plate: "KLE-7590", driver: "豆腐" },
+      { plate: "KLH-5111", driver: "小宇" }, { plate: "KLH-2828", driver: "架尬" },
+      { plate: "KLN-1027", driver: "豆花" }, { plate: "KLF-6106", driver: "紹興" },
+      { plate: "KLH-0931", driver: "王進展" }, { plate: "KLE-9201", driver: "小書包" },
+      { plate: "949-H9", driver: "控肉" }, { plate: "KLB-9315", driver: "阿憲" },
+      { plate: "KLL-2206", driver: "龍" }, { plate: "KLH-0585", driver: "" },
+      { plate: "KEP-8398", driver: "燒酒" }, { plate: "KEW-2792", driver: "陳平和" },
+      { plate: "KEH-5955", driver: "泰" }, { plate: "KLB-7158", driver: "" },
+      { plate: "KLK-5878", driver: "阿廷" }, { plate: "KEM-3076", driver: "" },
+      { plate: "KET-7537", driver: "阿賢" }, { plate: "KLM-0929", driver: "" },
+      { plate: "KLE-9550", driver: "" }, { plate: "KLL-2789", driver: "" },
+      { plate: "KLN-7963", driver: "" }
+    ];
 
- let currentRecords = [];
- let selectedIndices = new Set();
+    function onPlateInput(val) {
+      const keyword = val.trim().toUpperCase();
+      const dropdown = document.getElementById("plateDropdown");
+      if (!keyword) { dropdown.style.display = "none"; return; }
+      const matches = presetVehicles.filter(v => v.plate.replace('-', '').includes(keyword) || v.plate.includes(keyword));
+      if (matches.length === 0) { dropdown.style.display = "none"; return; }
 
- // 初始化車牌輸入框自動快選
- const plateInput = document.getElementById(plate);
- const dropdown = document.getElementById(plateDropdown);
+      dropdown.innerHTML = "";
+      matches.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<span>${item.plate}</span><span style="color:#718096">${item.driver || ''}</span>`;
+        div.onclick = () => {
+          document.getElementById("plate").value = item.plate;
+          if (item.driver) document.getElementById("driver").value = item.driver;
+          dropdown.style.display = "none";
+          document.getElementById("weight").focus();
+        };
+        dropdown.appendChild(div);
+      });
+      dropdown.style.display = "block";
+    }
 
- plateInput.addEventListener(input, function() {
- const keyword = this.value.trim().toUpperCase();
- if (!keyword) { dropdown.style.display = none; return; }
- 
- const matches = presetVehicles.filter(v => 
- v.plate.replace('-', '').includes(keyword) || 
- v.plate.includes(keyword) || 
- v.driver.includes(keyword)
- );
+    function onDriverInput(val) {
+      const keyword = val.trim();
+      const dropdown = document.getElementById("driverDropdown");
+      const matches = presetVehicles.filter(v => v.driver && (v.driver.includes(keyword) || !keyword));
+      if (matches.length === 0) { dropdown.style.display = "none"; return; }
 
- if (matches.length === 0) { dropdown.style.display = none; return; }
+      dropdown.innerHTML = "";
+      matches.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<span><b>${item.driver}</b></span><span style="color:#718096">${item.plate}</span>`;
+        div.onclick = () => {
+          document.getElementById("driver").value = item.driver;
+          if (item.plate) document.getElementById("plate").value = item.plate;
+          dropdown.style.display = "none";
+          document.getElementById("weight").focus();
+        };
+        dropdown.appendChild(div);
+      });
+      dropdown.style.display = "block";
+    }
 
- dropdown.innerHTML = ;
- matches.forEach(item => {
- const div = document.createElement(div);
- div.className = autocomplete-item;
- div.innerHTML = <span><b></b></span><span style=color:#6b778c></span>;
- div.onclick = () => {
- plateInput.value = item.plate;
- if (item.driver) document.getElementById(driver).value = item.driver;
- dropdown.style.display = none;
- // 自動帶入出場時間 (當前時間) 並將焦點跳至實重
- const now = new Date();
- const timeStr = ${String(now.getHours()).padStart(2,'0')}:;
- if (!document.getElementById(exit_time).value) {
- document.getElementById(exit_time).value = timeStr;
- }
- document.getElementById(weight).focus();
- };
- dropdown.appendChild(div);
- });
- dropdown.style.display = block;
- });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest('.autocomplete-wrap')) {
+        document.getElementById("plateDropdown").style.display = "none";
+        document.getElementById("driverDropdown").style.display = "none";
+      }
+    });
 
- document.addEventListener(click, (e) => {
- if (!e.target.closest('.autocomplete-box')) dropdown.style.display = none;
- });
+    let currentRecords = [];
 
- // 鍵盤快捷鍵：在重量或出場時間按 Enter 直接提交
- document.getElementById(weight).addEventListener(keydown, (e) => {
- if (e.key === Enter) submitEntry();
- });
- document.getElementById(exit_time).addEventListener(keydown, (e) => {
- if (e.key === Enter) submitEntry();
- });
+    function initApiConfig() {
+      const input = document.getElementById("apiServerInput");
+      const current = window.ScaleApi ? window.ScaleApi.getBaseUrl() : '';
+      input.value = current;
+      if (current) {
+        document.getElementById("apiStatusText").textContent = '連線至: ' + current;
+      }
+    }
 
- // 載入資料
- async function refreshData() {
- const statusDot = document.getElementById(statusDot);
- const statusText = document.getElementById(statusText);
- 
- const apiUrl = window.ScaleApi ? window.ScaleApi.getBaseUrl() : '';
- if (!apiUrl) {
- statusDot.className = status-dot offline;
- statusText.textContent = 未配置 GAS URL (點擊設定);
- renderEmptyPrompt();
- return;
- }
+    function saveApiServer() {
+      const val = document.getElementById("apiServerInput").value.trim();
+      if (window.ScaleApi) {
+        window.ScaleApi.setBaseUrl(val);
+        document.getElementById("apiStatusText").textContent = val ? '已設定連線至: ' + val : '已恢復為本機/同源 API';
+        loadRecords();
+      }
+    }
 
- statusDot.className = status-dot;
- statusText.textContent = 讀取雲端試算表...;
+    async function loadRecords() {
+      try {
+        const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
+        const res = await fetch(url);
+        const json = await res.json();
+        currentRecords = json.data || [];
+        renderTable();
+      } catch (err) {
+        console.error('讀取失敗:', err);
+        document.getElementById("apiStatusText").textContent = '連線失敗，請檢查 API 網址或網路';
+      }
+    }
 
- try {
- currentRecords = await window.ScaleApi.fetchDispatches();
- statusDot.className = status-dot online;
- statusText.textContent = GAS 試算表連線中;
- renderTable();
- } catch (err) {
- console.error(連線錯誤:, err);
- statusDot.className = status-dot offline;
- statusText.textContent = 連線失敗： + err.message;
- renderTable();
- }
- }
+    function renderTable() {
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+      let runningTotal = 0;
 
- function renderEmptyPrompt() {
- const tbody = document.getElementById(tableBody);
- tbody.innerHTML = 
- <tr>
- <td colspan=9 style=text-align:center; padding: 40px 20px;>
- <div style=font-size:1.1rem; font-weight:700; color:#de350b; margin-bottom:8px;>⚠️ 尚未配置 Google Apps Script 網址</div>
- <div style=color:#5e6c84; font-size:0.9rem; margin-bottom:16px;>請點擊右上角「⚙️ API 與金鑰設定」輸入發布後的 GAS Web App URL 即可開始連線 Google 試算表。</div>
- <button class=btn-sm btn-primary-sm onclick=openSettingsModal()>立即設定 API 網址</button>
- </td>
- </tr>
- ;
- }
+      currentRecords.forEach((r, idx) => {
+        runningTotal += r.weight;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><input type="checkbox" class="row-select" data-weight="${r.weight}" onchange="calculateSelected()"></td>
+          <td>${idx + 1}</td>
+          <td>${r.customer} / ${r.project} / ${r.material}</td>
+          <td>${r.driver}</td>
+          <td>${r.plate}</td>
+          <td>${r.weight.toLocaleString()}</td>
+          <td>${runningTotal.toLocaleString()}</td>
+          <td>${r.exit_time}</td>
+          <td><button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
 
- function renderTable() {
- const tbody = document.getElementById(tableBody);
- tbody.innerHTML = ;
+      document.getElementById("allTotalKg").textContent = runningTotal.toLocaleString();
+      document.getElementById("allTotalTon").textContent = (runningTotal / 1000).toFixed(2);
+      calculateSelected();
+    }
 
- let runningTotal = 0;
- currentRecords.forEach((r, idx) => {
- runningTotal += Number(r.weight);
- const tr = document.createElement(tr);
- const isChecked = selectedIndices.has(idx);
- if (isChecked) tr.className = row-checked;
+    function calculateSelected() {
+      const checkboxes = document.querySelectorAll(".row-select");
+      let sum = 0;
+      checkboxes.forEach(cb => {
+        if (cb.checked) sum += Number(cb.dataset.weight);
+      });
+      document.getElementById("selectedKg").textContent = sum.toLocaleString();
+      document.getElementById("selectedTon").textContent = (sum / 1000).toFixed(2);
+    }
 
- tr.innerHTML = 
- <td><input type=checkbox class=row-select data-idx= onchange=onRowCheckChanged(, this.checked)></td>
- <td class=td-num>第 車</td>
- <td> / / </td>
- <td><b></b></td>
- <td class=td-plate></td>
- <td class=td-weight></td>
- <td style=color:#0052cc; font-weight:600;></td>
- <td></td>
- <td><button class=btn-delete onclick=deleteEntry()>刪除</button></td>
- ;
- tbody.appendChild(tr);
- });
+    function applyRangeSelection() {
+      const from = parseInt(document.getElementById("fromIndex").value, 10);
+      const to = parseInt(document.getElementById("toIndex").value, 10);
+      if (isNaN(from) || isNaN(to) || from > to) return;
 
- document.getElementById(allTotalDisplay).textContent = ${runningTotal.toLocaleString()} KG ( 噸);
- document.getElementById(recordCountDisplay).textContent = (共 車次);
- calculateSelected();
- }
+      document.querySelectorAll(".row-select").forEach((cb, idx) => {
+        const rank = idx + 1;
+        cb.checked = rank >= from && rank <= to;
+      });
+      calculateSelected();
+    }
 
- function onRowCheckChanged(idx, isChecked) {
- if (isChecked) selectedIndices.add(idx);
- else selectedIndices.delete(idx);
- renderTable();
- }
+    function toggleSelectAll(status) {
+      document.querySelectorAll(".row-select").forEach(cb => cb.checked = status);
+      document.getElementById("checkAll").checked = status;
+      calculateSelected();
+    }
 
- function calculateSelected() {
- let sumKg = 0;
- selectedIndices.forEach(idx => {
- if (currentRecords[idx]) sumKg += Number(currentRecords[idx].weight);
- });
- document.getElementById(selectedTonDisplay).textContent = ${(sumKg / 1000).toFixed(2)} 噸;
- document.getElementById(selectedKgDisplay).textContent = ( KG);
- }
+    async function submitEntry() {
+      const payload = {
+        customer: document.getElementById("customer").value.trim(),
+        project: document.getElementById("project").value.trim(),
+        material: document.getElementById("material").value.trim(),
+        driver: document.getElementById("driver").value.trim(),
+        plate: document.getElementById("plate").value.trim(),
+        weight: parseInt(document.getElementById("weight").value, 10),
+        exit_time: document.getElementById("exit_time").value.trim()
+      };
 
- function applyRangeSelection() {
- const from = parseInt(document.getElementById(fromIndex).value, 10);
- const to = parseInt(document.getElementById(toIndex).value, 10);
- if (isNaN(from) || isNaN(to) || from > to) {
- alert(請輸入有效的車次起訖區間 (例如 1 至 8));
- return;
- }
- selectedIndices.clear();
- for (let i = 0; i < currentRecords.length; i++) {
- const order = i + 1;
- if (order >= from && order <= to) selectedIndices.add(i);
- }
- renderTable();
- }
+      if (!payload.plate || isNaN(payload.weight) || payload.weight <= 0) {
+        alert("請確認車牌與重量填寫正確！");
+        return;
+      }
 
- function toggleSelectAll(status) {
- selectedIndices.clear();
- if (status) {
- currentRecords.forEach((_, idx) => selectedIndices.add(idx));
- }
- document.getElementById(checkAll).checked = status;
- renderTable();
- }
+      const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
- async function submitEntry() {
- const btn = document.getElementById(btnSubmit);
- const plate = document.getElementById(plate).value.trim().toUpperCase();
- const weight = parseInt(document.getElementById(weight).value, 10);
+      if (res.ok) {
+        document.getElementById("driver").value = "";
+        document.getElementById("plate").value = "";
+        document.getElementById("weight").value = "";
+        document.getElementById("exit_time").value = "";
+        loadRecords();
+      }
+    }
 
- if (!plate || isNaN(weight) || weight <= 0) {
- alert(請確認已輸入車牌與正確的實重！);
- return;
- }
+    async function deleteRecord(id) {
+      if (!confirm("確定要刪除此筆出貨紀錄嗎？")) return;
+      const url = window.ScaleApi ? window.ScaleApi.getUrl(`/api/dispatches/${id}`) : `/api/dispatches/${id}`;
+      const res = await fetch(url, { method: 'DELETE' });
+      if (res.ok) loadRecords();
+    }
 
- const payload = {
- customer: document.getElementById(customer).value.trim(),
- project: document.getElementById(project).value.trim(),
- material: document.getElementById(material).value.trim(),
- driver: document.getElementById(driver).value.trim(),
- plate: plate,
- weight: weight,
- exit_time: document.getElementById(exit_time).value.trim()
- };
-
- try {
- btn.disabled = true;
- btn.textContent = 寫入試算表中...;
- await window.ScaleApi.postAction(addDispatch, payload);
- // 清空輸入欄位
- document.getElementById(plate).value = ;
- document.getElementById(driver).value = ;
- document.getElementById(weight).value = ;
- document.getElementById(exit_time).value = ;
- document.getElementById(plate).focus();
- await refreshData();
- } catch (err) {
- alert(寫入失敗:  + err.message);
- } finally {
- btn.disabled = false;
- btn.innerHTML = <span>儲存並即時發送</span><span style=font-size:0.85rem; opacity:0.8;>(Enter)</span>;
- }
- }
-
- async function deleteEntry(id) {
- if (!confirm(確定要從 Google 試算表中刪除 ID: 此筆出貨紀錄嗎？)) return;
- try {
- await window.ScaleApi.postAction(deleteDispatch, { id: id });
- await refreshData();
- } catch (err) {
- alert(刪除失敗:  + err.message);
- }
- }
-
- // Modal 操作
- function openSettingsModal() {
- document.getElementById(modalApiUrl).value = window.ScaleApi.getBaseUrl();
- document.getElementById(modalAdminKey).value = window.ScaleApi.getAdminKey();
- document.getElementById(settingsModal).style.display = flex;
- }
- function closeSettingsModal() {
- document.getElementById(settingsModal).style.display = none;
- }
- function saveSettings() {
- const url = document.getElementById(modalApiUrl).value.trim();
- const key = document.getElementById(modalAdminKey).value.trim();
- window.ScaleApi.setBaseUrl(url);
- window.ScaleApi.setAdminKey(key);
- closeSettingsModal();
- refreshData();
- }
-
- // 初始化出場時間預設值
- const d = new Date();
- document.getElementById(exit_time).value = ${String(d.getHours()).padStart(2,'0')}:;
-
- // 啟動資料載入
- refreshData();
- </script>
+    initApiConfig();
+    loadRecords();
+  </script>
 </body>
 </html>

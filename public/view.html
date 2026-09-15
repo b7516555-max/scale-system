@@ -1,460 +1,221 @@
-﻿<!DOCTYPE html>
-<html lang=zh-TW>
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-  <meta charset=UTF-8>
-  <meta name=viewport content=width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover>
-  <meta name=apple-mobile-web-app-capable content=yes>
-  <meta name=apple-mobile-web-app-status-bar-style content=black-translucent>
-  <meta name=mobile-web-app-capable content=yes>
-  <meta name=theme-color content=#0052cc>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>出貨車次查詢 (唯讀加總版)</title>
   <style>
-    :root {
-      --primary: #0052cc;
-      --primary-sub: #ebf8ff;
-      --border-blue: #0052cc;
-      --bg: #f4f5f7;
-      --card-bg: #ffffff;
-      --text-main: #172b4d;
-      --text-sub: #5e6c84;
-      --danger: #de350b;
-    }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, SF Pro Text, Segoe UI, Roboto, sans-serif;
-      margin: 0;
-      padding: 0 0 135px 0;
-      background: var(--bg);
-      color: var(--text-main);
-      user-select: none;
-      -webkit-font-smoothing: antialiased;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0; padding: 12px 12px 130px 12px; background: #f0f2f5; color: #1a202c;
     }
-
-    /* 原生 App 質感頂部導航列 */
-    .app-header {
-      position: sticky;
-      top: 0;
-      background: #ffffff;
-      padding: 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.08);
-      z-index: 100;
-    }
-    .app-header h1 {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #091e42;
-      margin: 0;
-    }
-    .badge-readonly {
-      background: #ebecf0;
-      color: #42526e;
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 12px;
-    }
-
-    .container {
-      padding: 12px;
-    }
-
-    /* 頂部工程概況卡片 */
-    .info-card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 12px 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 2px rgba(9,30,66,0.06);
-      font-size: 0.88rem;
-      line-height: 1.6;
-    }
-    .info-item {
-      display: flex;
-      color: var(--text-sub);
-    }
-    .info-item b {
-      color: var(--text-main);
-      margin-left: 6px;
-    }
-
-    /* 手機快捷工具列 */
-    .tool-card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 12px 14px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 2px rgba(9,30,66,0.06);
-    }
-    .tool-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      font-size: 0.92rem;
-      font-weight: 600;
-    }
-    .tool-row:last-child { margin-bottom: 0; }
-    .input-range {
-      width: 60px;
-      padding: 7px 4px;
-      text-align: center;
-      border: 1.5px solid #dfe1e6;
-      border-radius: 6px;
-      font-size: 0.95rem;
-      font-weight: 700;
-    }
-    .input-filter {
-      flex: 1;
-      padding: 8px 12px;
-      border: 1.5px solid #dfe1e6;
-      border-radius: 8px;
-      font-size: 0.92rem;
-    }
-    .input-filter:focus, .input-range:focus {
-      outline: none;
-      border-color: var(--primary);
-    }
-    .btn-group {
-      display: flex;
-      gap: 6px;
-    }
-    .btn-m {
-      flex: 1;
-      padding: 9px 0;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.88rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.1s, opacity 0.1s;
-    }
-    .btn-m:active { transform: scale(0.97); opacity: 0.85; }
-    .btn-primary-m { background: var(--primary); color: #fff; }
-    .btn-light-m { background: #ebecf0; color: #42526e; }
-
-    /* 車次卡片列表 (Mobile-First 大字卡) */
-    .card-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .header-card { background: #ffffff; padding: 14px 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; }
+    .header-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header-card h1 { margin: 0; font-size: 1.15rem; color: #1a365d; }
+    .badge-readonly { background: #edf2f7; color: #4a5568; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+    .info-line { font-size: 0.88rem; color: #4a5568; line-height: 1.5; }
+    .info-line b { color: #2d3748; }
+    .tool-panel { background: #ffffff; padding: 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 14px; }
+    .tool-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.9rem; }
+    .tool-row input { padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.95rem; }
+    .range-num { width: 55px; text-align: center; }
+    .search-input { flex: 1; }
+    .btn-group { display: flex; gap: 6px; }
+    .btn { flex: 1; padding: 8px 0; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .btn-apply { background: #0052cc; color: #fff; }
+    .btn-neutral { background: #edf2f7; color: #4a5568; }
     .truck-card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 14px 16px;
-      box-shadow: 0 1.5px 3px rgba(9,30,66,0.06);
-      border: 2px solid transparent;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      cursor: pointer;
-      transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease;
+      background: #ffffff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 2px solid transparent; display: flex;
+      align-items: center; gap: 12px; user-select: none; -webkit-tap-highlight-color: transparent; transition: all 0.15s ease;
     }
-    .truck-card:active {
-      transform: scale(0.985);
+    .truck-card.selected { border-color: #0052cc; background-color: #ebf8ff; }
+    .truck-card input[type="checkbox"] { width: 22px; height: 22px; accent-color: #0052cc; pointer-events: none; }
+    .truck-info { flex: 1; }
+    .truck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .truck-no { font-weight: 700; font-size: 0.95rem; color: #0052cc; }
+    .truck-plate { font-size: 1.05rem; font-weight: 700; color: #2d3748; }
+    .truck-driver { font-size: 0.9rem; color: #718096; font-weight: 500; margin-left: 6px; }
+    .truck-detail { font-size: 0.85rem; color: #718096; display: flex; justify-content: space-between; align-items: baseline; }
+    .truck-weight { font-size: 1.1rem; font-weight: 700; color: #1a202c; }
+    .sticky-footer {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; padding: 12px 16px;
+      box-shadow: 0 -3px 12px rgba(0,0,0,0.12); border-top: 1px solid #e2e8f0; z-index: 99;
     }
-    .truck-card.selected {
-      border-color: var(--border-blue);
-      background-color: var(--primary-sub);
-    }
-    .truck-checkbox {
-      width: 22px;
-      height: 22px;
-      accent-color: var(--primary);
-      pointer-events: none;
-      flex-shrink: 0;
-    }
-    .truck-info {
-      flex: 1;
-    }
-    .truck-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 4px;
-    }
-    .truck-no {
-      font-size: 0.92rem;
-      font-weight: 800;
-      color: var(--primary);
-    }
-    .truck-plate-wrap {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-    }
-    .truck-plate {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #091e42;
-    }
-    .truck-driver {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #5e6c84;
-    }
-    .truck-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-top: 2px;
-    }
-    .truck-time {
-      font-size: 0.82rem;
-      color: #6b778c;
-    }
-    .truck-weight {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #091e42;
-      font-family: -apple-system, monospace;
-    }
-
-    /* 底部吸底固定結算列 (Sticky Bottom Bar) */
-    .sticky-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #ffffff;
-      padding: 12px 18px env(safe-area-inset-bottom, 14px) 18px;
-      box-shadow: 0 -4px 14px rgba(9,30,66,0.12);
-      border-top: 1px solid #ebecf0;
-      z-index: 1000;
-    }
-    .bar-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-    }
-    .bar-title {
-      font-size: 0.82rem;
-      color: var(--text-sub);
-    }
-    .bar-total-all {
-      font-size: 0.88rem;
-      color: #42526e;
-      font-weight: 600;
-    }
-    .bar-selected-wrap {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
-    .bar-count {
-      font-size: 0.88rem;
-      font-weight: 700;
-      color: var(--text-sub);
-    }
-    .bar-selected-ton {
-      font-size: 1.65rem;
-      font-weight: 900;
-      color: var(--danger);
-      font-family: -apple-system, monospace;
-    }
-    .bar-selected-kg {
-      text-align: right;
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--danger);
-      opacity: 0.85;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 40px 16px;
-      color: #6b778c;
-      font-size: 0.95rem;
-    }
+    .footer-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+    .footer-title { font-size: 0.85rem; color: #718096; }
+    .footer-total-all { font-size: 0.88rem; color: #4a5568; }
+    .footer-selected-main { font-size: 1.3rem; font-weight: 800; color: #c53030; }
+    .footer-selected-sub { font-size: 0.82rem; color: #718096; }
   </style>
-  <script src=api-config.js></script>
+  <script src="api-config.js"></script>
 </head>
 <body>
 
-  <!-- 原生 App 導航列 -->
-  <header class=app-header>
-    <h1>現場出貨過磅</h1>
-    <span class=badge-readonly>📱 現場唯讀模式</span>
-  </header>
-
-  <div class=container>
-    <!-- 工程資訊卡片 -->
-    <div class=info-card>
-      <div class=info-item>客戶：<b id=infoCustomer>-</b></div>
-      <div class=info-item>工程：<b id=infoProject>-</b></div>
-      <div class=info-item>料別：<b id=infoMaterial>-</b></div>
+  <div class="header-card">
+    <div class="header-title-row">
+      <h1>現場出貨過磅</h1>
+      <span class="badge-readonly">手機唯讀模式</span>
     </div>
+    <div class="info-line">客戶：<b id="infoCustomer">-</b></div>
+    <div class="info-line">工程：<b id="infoProject">-</b></div>
+    <div class="info-line">料別：<b id="infoMaterial">-</b></div>
+  </div>
 
-    <!-- 快捷操作面板 -->
-    <div class=tool-card>
-      <div class=tool-row>
-        <span>車次：第</span>
-        <input type=number id=rangeFrom class=input-range inputmode=numeric placeholder=1>
-        <span>車 至 第</span>
-        <input type=number id=rangeTo class=input-range inputmode=numeric placeholder=8>
-        <span>車</span>
-        <button class=btn-m btn-primary-m style=padding: 7px 12px; margin-left: auto; onclick=applyRange()>套用</button>
-      </div>
-      <div class=tool-row>
-        <input type=text id=plateSearch class=input-filter placeholder=🔍 輸入車牌 4 碼過濾 (如 0931, 6663) oninput=filterCards()>
-      </div>
-      <div class=btn-group>
-        <button class=btn-m btn-light-m onclick=selectAllCards(true)>全部勾選</button>
-        <button class=btn-m btn-light-m onclick=selectAllCards(false)>清除選取</button>
-        <button class=btn-m btn-light-m onclick=loadData()>🔄 刷新</button>
-      </div>
+  <div class="tool-panel">
+    <div class="tool-row">
+      <span>車次：第</span>
+      <input type="number" id="rangeFrom" class="range-num" inputmode="numeric" placeholder="1">
+      <span>車 至 第</span>
+      <input type="number" id="rangeTo" class="range-num" inputmode="numeric" placeholder="7">
+      <span>車</span>
     </div>
-
-    <!-- 大字卡列表 -->
-    <div class=card-list id=cardList>
-      <div class=empty-state>連線雲端資料載入中...</div>
+    <div class="tool-row">
+      <span style="font-size: 0.85rem;">車牌篩選：</span>
+      <input type="text" id="plateFilter" class="search-input" placeholder="輸入數字4碼 (如 0931)" oninput="filterCards()">
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-apply" onclick="selectRange()">套用區間</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(true)">全部勾選</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(false)">取消勾選</button>
     </div>
   </div>
 
-  <!-- 底部吸底固定結算列 -->
-  <footer class=sticky-bar>
-    <div class=bar-row style=margin-bottom: 3px;>
-      <span class=bar-title>全日總發貨</span>
-      <span class=bar-total-all id=totalAllDisplay>0 KG (0.00 T)</span>
+  <div id="truckList"></div>
+
+  <div class="sticky-footer">
+    <div class="footer-row">
+      <span class="footer-title">全日總發貨</span>
+      <span class="footer-total-all" id="textAllTotal">0 KG (0.00 T)</span>
     </div>
-    <div class=bar-row>
-      <div class=bar-selected-wrap>
-        <span class=bar-title style=font-weight:700; color:#091e42;>已勾選加總</span>
-        <span class=bar-count id=selectedCountDisplay>(0 輛)</span>
+    <div class="footer-row">
+      <div>
+        <span class="footer-title">已勾選加總</span>
+        <span class="footer-selected-sub" id="selectedCount">(0 輛)</span>
       </div>
-      <div class=bar-selected-ton id=selectedTonDisplay>0.00 噸</div>
+      <div class="footer-selected-main" id="textSelectedTotal">0.00 噸</div>
     </div>
-    <div class=bar-selected-kg id=selectedKgDisplay>0 KG</div>
-  </footer>
+    <div style="text-align: right; font-size: 0.8rem; color: #a0aec0;" id="textSelectedKg">0 KG</div>
+  </div>
 
   <script>
     let dispatches = [];
-    let selectedSet = new Set();
 
-    async function loadData() {
+    async function fetchData() {
       try {
-        dispatches = await window.ScaleApi.fetchDispatches();
+        const url = window.ScaleApi ? window.ScaleApi.getUrl('/api/dispatches') : '/api/dispatches';
+        const res = await fetch(url);
+        const result = await res.json();
+        dispatches = result.data || [];
+
         if (dispatches.length > 0) {
-          document.getElementById(infoCustomer).textContent = dispatches[0].customer || '-';
-          document.getElementById(infoProject).textContent = dispatches[0].project || '-';
-          document.getElementById(infoMaterial).textContent = dispatches[0].material || '-';
+          document.getElementById('infoCustomer').textContent = dispatches[0].customer || '-';
+          document.getElementById('infoProject').textContent = dispatches[0].project || '-';
+          document.getElementById('infoMaterial').textContent = dispatches[0].material || '-';
         }
-        renderCards();
+        renderList();
       } catch (err) {
-        document.getElementById(cardList).innerHTML = 
-          <div class=empty-state style=color: #de350b;>
-            ⚠️ 資料載入失敗: <br>
-            <span style=font-size:0.8rem; color:#6b778c;>請確認網址是否包含 ?api=... 或點擊刷新重試</span>
-          </div>
-        ;
+        console.error('資料載入錯誤:', err);
       }
     }
 
-    function renderCards() {
-      const container = document.getElementById(cardList);
-      container.innerHTML = ";
+    function renderList() {
+      const container = document.getElementById('truckList');
+      container.innerHTML = '';
+      let totalAllKg = 0;
 
- if (dispatches.length === 0) {
- container.innerHTML = <div class=empty-state>目前尚無任何過磅紀錄</div>;
- updateFooterTotals(0);
- return;
- }
+      dispatches.forEach((item, index) => {
+        totalAllKg += item.weight;
+        const card = document.createElement('div');
+        card.className = 'truck-card';
+        card.id = `card-${index}`;
 
- let totalAll = 0;
- dispatches.forEach((item, index) => {
- totalAll += Number(item.weight);
- const card = document.createElement(div);
- card.className = truck-card + (selectedSet.has(index) ?  selected : );
- card.id = card-;
+        card.onclick = () => {
+          const cb = card.querySelector('input[type="checkbox"]');
+          cb.checked = !cb.checked;
+          updateCardStyle(card, cb.checked);
+          calculate();
+        };
 
- card.onclick = () => {
- if (selectedSet.has(index)) selectedSet.delete(index);
- else selectedSet.add(index);
- 
- card.classList.toggle(selected, selectedSet.has(index));
- card.querySelector(.truck-checkbox).checked = selectedSet.has(index);
- calculate();
- };
+        card.innerHTML = `
+          <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}">
+          <div class="truck-info">
+            <div class="truck-head">
+              <span class="truck-no">第 ${index + 1} 車</span>
+              <div>
+                <span class="truck-plate">${item.plate}</span>
+                <span class="truck-driver">${item.driver}</span>
+              </div>
+            </div>
+            <div class="truck-detail">
+              <span>出廠 ${item.exit_time}</span>
+              <span class="truck-weight">${item.weight.toLocaleString()} KG</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
 
- card.innerHTML = 
- <input type=checkbox class=truck-checkbox >
- <div class=truck-info>
- <div class=truck-top>
- <span class=truck-no>第 車</span>
- <div class=truck-plate-wrap>
- <span class=truck-plate></span>
- <span class=truck-driver></span>
- </div>
- </div>
- <div class=truck-bottom>
- <span class=truck-time>出場 </span>
- <span class=truck-weight> KG</span>
- </div>
- </div>
- ;
- container.appendChild(card);
- });
+      document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
+      calculate();
+    }
 
- updateFooterTotals(totalAll);
- calculate();
- }
+    function updateCardStyle(card, isChecked) {
+      if (isChecked) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
 
- function updateFooterTotals(allKg) {
- document.getElementById(totalAllDisplay).textContent = ${allKg.toLocaleString()} KG ( T);
- }
+    function calculate() {
+      const checkboxes = document.querySelectorAll('.car-check');
+      let sum = 0, count = 0;
+      checkboxes.forEach((cb) => {
+        if (cb.checked) {
+          sum += Number(cb.dataset.weight);
+          count++;
+        }
+      });
+      document.getElementById('textSelectedTotal').textContent = `${(sum / 1000).toFixed(2)} 噸`;
+      document.getElementById('textSelectedKg').textContent = `${sum.toLocaleString()} KG`;
+      document.getElementById('selectedCount').textContent = `(${count} 輛)`;
+    }
 
- function calculate() {
- let sumKg = 0;
- selectedSet.forEach(idx => {
- if (dispatches[idx]) sumKg += Number(dispatches[idx].weight);
- });
+    function selectRange() {
+      const from = parseInt(document.getElementById('rangeFrom').value, 10);
+      const to = parseInt(document.getElementById('rangeTo').value, 10);
+      if (isNaN(from) || isNaN(to) || from > to) return;
 
- document.getElementById(selectedTonDisplay).textContent = ${(sumKg / 1000).toFixed(2)} 噸;
- document.getElementById(selectedKgDisplay).textContent = ${sumKg.toLocaleString()} KG;
- document.getElementById(selectedCountDisplay).textContent = ( 輛);
- }
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const order = idx + 1;
+        const shouldCheck = order >= from && order <= to;
+        cb.checked = shouldCheck;
+        updateCardStyle(document.getElementById(`card-${idx}`), shouldCheck);
+      });
+      calculate();
+    }
 
- function applyRange() {
- const from = parseInt(document.getElementById(rangeFrom).value, 10);
- const to = parseInt(document.getElementById(rangeTo).value, 10);
- if (isNaN(from) || isNaN(to) || from > to) {
- alert(請輸入正確車次範圍);
- return;
- }
- selectedSet.clear();
- for (let i = 0; i < dispatches.length; i++) {
- const order = i + 1;
- if (order >= from && order <= to) selectedSet.add(i);
- }
- renderCards();
- }
+    function setSelectAll(status) {
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        if (card.style.display !== 'none') {
+          cb.checked = status;
+          updateCardStyle(card, status);
+        }
+      });
+      calculate();
+    }
 
- function selectAllCards(status) {
- selectedSet.clear();
- if (status) {
- dispatches.forEach((_, idx) => {
- const card = document.getElementById(card-);
- if (card && card.style.display !== 'none') selectedSet.add(idx);
- });
- }
- renderCards();
- }
+    function filterCards() {
+      const keyword = document.getElementById('plateFilter').value.trim().toUpperCase();
+      dispatches.forEach((item, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        const plateClean = item.plate.replace('-', '').toUpperCase();
+        const matches = plateClean.includes(keyword) || item.plate.toUpperCase().includes(keyword);
+        card.style.display = matches ? 'flex' : 'none';
+      });
+    }
 
- function filterCards() {
- const kw = document.getElementById(plateSearch).value.trim().toUpperCase();
- dispatches.forEach((item, idx) => {
- const card = document.getElementById(card-);
- if (!card) return;
- const plateClean = item.plate.replace('-', '').toUpperCase();
- const matches = plateClean.includes(kw) || item.plate.toUpperCase().includes(kw);
- card.style.display = matches ? flex : none;
- });
- }
-
- loadData();
- </script>
+    fetchData();
+  </script>
 </body>
 </html>
