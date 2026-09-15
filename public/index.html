@@ -36,6 +36,62 @@
     .server-setting-bar { background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
     .server-setting-bar input { width: 320px; padding: 6px 10px; font-size: 0.85rem; }
     .badge-cloud { background: #3182ce; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+
+    /* 方案 1：多工程分頁籤樣式 */
+    .project-tabs-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .project-tab-btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e0;
+      color: #4a5568;
+      font-weight: 700;
+      font-size: 0.92rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .project-tab-btn:hover {
+      background: #ebf8ff;
+      border-color: #0052cc;
+      color: #0052cc;
+    }
+    .project-tab-btn.active {
+      background: #0052cc;
+      border-color: #0052cc;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,82,204,0.25);
+    }
+    .project-tab-count {
+      font-size: 0.78rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.08);
+      font-weight: 700;
+    }
+    .project-tab-btn.active .project-tab-count {
+      background: rgba(255,255,255,0.25);
+      color: #ffffff;
+    }
+    .btn-add-tab {
+      background: #edf2f7;
+      border: 1.5px dashed #a0aec0;
+      color: #4a5568;
+    }
+    .btn-add-tab:hover {
+      background: #e2e8f0;
+      border-color: #718096;
+    }
   </style>
   <script src="api-config.js"></script>
 </head>
@@ -51,8 +107,16 @@
     <div style="font-size: 0.8rem; color: #718096;" id="apiStatusText">就緒</div>
   </div>
 
+  <!-- 方案 1：工程地點分頁標籤切換列 -->
+  <div class="project-tabs-container" id="projectTabsContainer">
+    <!-- 動態生成頁籤 -->
+  </div>
+
   <div class="card">
-    <h2>工程項目設定</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-bottom: 12px;">
+      <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
+      <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
+    </div>
     <div class="grid">
       <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
       <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
@@ -224,6 +288,8 @@
     }
 
     let currentRecords = [];
+    let activeProject = "全部地點";
+    let knownProjects = new Map(); // project -> { customer, material, count }
 
     function initApiConfig() {
       const input = document.getElementById("apiServerInput");
@@ -243,9 +309,95 @@
       }
     }
 
+    function updateKnownProjects() {
+      knownProjects.clear();
+      // 預設第一個工程地點
+      const defaultP = document.getElementById("project").value.trim() || "苓雅區武慶三路";
+      const defaultC = document.getElementById("customer").value.trim() || "高雄市政府";
+      const defaultM = document.getElementById("material").value.trim() || "1/2密集配";
+      knownProjects.set(defaultP, { customer: defaultC, material: defaultM, count: 0 });
+
+      // 從已有歷史資料匯整出現過的所有地點
+      currentRecords.forEach(r => {
+        const pName = r.project || "未指定地點";
+        if (!knownProjects.has(pName)) {
+          knownProjects.set(pName, { customer: r.customer || "", material: r.material || "", count: 0 });
+        }
+        knownProjects.get(pName).count++;
+      });
+    }
+
+    function renderProjectTabs() {
+      const container = document.getElementById("projectTabsContainer");
+      container.innerHTML = "";
+
+      // 1.「全部地點」頁籤
+      const allBtn = document.createElement("button");
+      allBtn.className = "project-tab-btn" + (activeProject === "全部地點" ? " active" : "");
+      allBtn.innerHTML = `<span>🌐 全部地點</span><span class="project-tab-count">${currentRecords.length} 車</span>`;
+      allBtn.onclick = () => switchProjectTab("全部地點");
+      container.appendChild(allBtn);
+
+      // 2. 各個工程地點頁籤
+      knownProjects.forEach((meta, pName) => {
+        const btn = document.createElement("button");
+        btn.className = "project-tab-btn" + (activeProject === pName ? " active" : "");
+        btn.innerHTML = `<span>📍 ${pName}</span><span class="project-tab-count">${meta.count} 車</span>`;
+        btn.onclick = () => switchProjectTab(pName);
+        container.appendChild(btn);
+      });
+
+      // 3. 快速分享當前案場連結按鈕
+      if (activeProject !== "全部地點") {
+        const shareBtn = document.createElement("button");
+        shareBtn.className = "project-tab-btn";
+        shareBtn.style.borderColor = "#38a169";
+        shareBtn.style.color = "#276749";
+        shareBtn.innerHTML = `<span>📋 複製此工地主任專用連結</span>`;
+        shareBtn.onclick = copyProjectShareLink;
+        container.appendChild(shareBtn);
+      }
+    }
+
+    function switchProjectTab(pName) {
+      activeProject = pName;
+      if (pName !== "全部地點" && knownProjects.has(pName)) {
+        const meta = knownProjects.get(pName);
+        document.getElementById("project").value = pName;
+        if (meta.customer) document.getElementById("customer").value = meta.customer;
+        if (meta.material) document.getElementById("material").value = meta.material;
+      }
+      renderProjectTabs();
+      renderTable();
+    }
+
+    function addNewProjectPrompt() {
+      const newName = prompt("請輸入新的工程名稱 / 地點：", "小港區沿海路");
+      if (!newName || !newName.trim()) return;
+      const cleanName = newName.trim();
+      const newCustomer = prompt("請輸入該案場的客戶名稱：", document.getElementById("customer").value || "高雄市政府") || "高雄市政府";
+      const newMaterial = prompt("請輸入該案場的料別：", document.getElementById("material").value || "1/2密集配") || "1/2密集配";
+      
+      knownProjects.set(cleanName, { customer: newCustomer.trim(), material: newMaterial.trim(), count: 0 });
+      switchProjectTab(cleanName);
+    }
+
+    function copyProjectShareLink() {
+      if (activeProject === "全部地點") return;
+      const baseUrl = window.location.href.split('?')[0].replace('index.html', 'view.html');
+      const shareUrl = `${baseUrl}?project=${encodeURIComponent(activeProject)}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}\n\n傳給該工地主任，手機點開只會看到該工程車次！`);
+      }).catch(() => {
+        prompt("請複製此連結傳給該工地主任：", shareUrl);
+      });
+    }
+
     async function loadRecords() {
       try {
         currentRecords = await window.ScaleApi.fetchDispatches();
+        updateKnownProjects();
+        renderProjectTabs();
         renderTable();
         document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
       } catch (err) {
@@ -259,13 +411,18 @@
       tbody.innerHTML = "";
       let runningTotal = 0;
 
-      currentRecords.forEach((r, idx) => {
+      // 依當前選中頁籤進行工程過濾
+      const displayRecords = activeProject === "全部地點" 
+        ? currentRecords 
+        : currentRecords.filter(r => r.project === activeProject);
+
+      displayRecords.forEach((r, idx) => {
         runningTotal += r.weight;
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-weight="${r.weight}" onchange="calculateSelected()"></td>
           <td>${idx + 1}</td>
-          <td>${r.customer} / ${r.project} / ${r.material}</td>
+          <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
           <td>${r.driver}</td>
           <td>${r.plate}</td>
           <td>${r.weight.toLocaleString()}</td>
@@ -276,6 +433,7 @@
         tbody.appendChild(tr);
       });
 
+      const titlePrefix = activeProject === "全部地點" ? "全部總重" : `【${activeProject}】總重`;
       document.getElementById("allTotalKg").textContent = runningTotal.toLocaleString();
       document.getElementById("allTotalTon").textContent = (runningTotal / 1000).toFixed(2);
       calculateSelected();

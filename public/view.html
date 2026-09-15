@@ -48,14 +48,58 @@
     .footer-total-all { font-size: 0.88rem; color: #4a5568; }
     .footer-selected-main { font-size: 1.3rem; font-weight: 800; color: #c53030; }
     .footer-selected-sub { font-size: 0.82rem; color: #718096; }
+
+    /* 手機端工程頁籤滑動列 */
+    .mobile-project-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px 10px 2px;
+      margin-bottom: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-project-tabs::-webkit-scrollbar { display: none; }
+    .m-tab-btn {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #4a5568;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .m-tab-btn.active {
+      background: #0052cc;
+      border-color: #0052cc;
+      color: #ffffff;
+    }
+    .m-tab-count {
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.08);
+    }
+    .m-tab-btn.active .m-tab-count {
+      background: rgba(255,255,255,0.25);
+      color: #ffffff;
+    }
   </style>
   <script src="api-config.js"></script>
 </head>
 <body>
 
+  <!-- 手機端工程分頁標籤滑動列 -->
+  <div class="mobile-project-tabs" id="mobileTabsContainer"></div>
+
   <div class="header-card">
     <div class="header-title-row">
-      <h1>現場出貨過磅</h1>
+      <h1 id="pageHeadingTitle">現場出貨過磅</h1>
       <span class="badge-readonly">手機唯讀模式</span>
     </div>
     <div class="info-line">客戶：<b id="infoCustomer">-</b></div>
@@ -101,20 +145,67 @@
 
   <script>
     let dispatches = [];
+    let activeProject = "全部地點";
+    let projectCounts = new Map();
+
+    // 檢查 URL 參數是否指定了特定工程地點 (例如 ?project=苓雅區武慶三路)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramProject = urlParams.get('project');
+    if (paramProject) {
+      activeProject = decodeURIComponent(paramProject.trim());
+    }
 
     async function fetchData() {
       try {
         dispatches = await window.ScaleApi.fetchDispatches();
-
-        if (dispatches.length > 0) {
-          document.getElementById('infoCustomer').textContent = dispatches[0].customer || '-';
-          document.getElementById('infoProject').textContent = dispatches[0].project || '-';
-          document.getElementById('infoMaterial').textContent = dispatches[0].material || '-';
-        }
+        updateProjectCounts();
+        renderProjectTabs();
         renderList();
       } catch (err) {
         console.error('資料載入錯誤:', err);
       }
+    }
+
+    function updateProjectCounts() {
+      projectCounts.clear();
+      dispatches.forEach(item => {
+        const p = item.project || '未指定地點';
+        projectCounts.set(p, (projectCounts.get(p) || 0) + 1);
+      });
+    }
+
+    function renderProjectTabs() {
+      const container = document.getElementById('mobileTabsContainer');
+      container.innerHTML = '';
+
+      // 若只有 1 個工程或沒有資料，隱藏頁籤
+      if (projectCounts.size <= 1 && activeProject === "全部地點") {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'flex';
+
+      // 1.「全部地點」頁籤
+      const allBtn = document.createElement('button');
+      allBtn.className = 'm-tab-btn' + (activeProject === '全部地點' ? ' active' : '');
+      allBtn.innerHTML = `<span>🌐 全部</span><span class="m-tab-count">${dispatches.length}</span>`;
+      allBtn.onclick = () => switchMobileTab('全部地點');
+      container.appendChild(allBtn);
+
+      // 2. 各個工程地點頁籤
+      projectCounts.forEach((cnt, pName) => {
+        const btn = document.createElement('button');
+        btn.className = 'm-tab-btn' + (activeProject === pName ? ' active' : '');
+        btn.innerHTML = `<span>📍 ${pName}</span><span class="m-tab-count">${cnt}</span>`;
+        btn.onclick = () => switchMobileTab(pName);
+        container.appendChild(btn);
+      });
+    }
+
+    function switchMobileTab(pName) {
+      activeProject = pName;
+      renderProjectTabs();
+      renderList();
     }
 
     function renderList() {
@@ -122,7 +213,21 @@
       container.innerHTML = '';
       let totalAllKg = 0;
 
-      dispatches.forEach((item, index) => {
+      // 依當前頁籤過濾車次清單
+      const filtered = activeProject === "全部地點" 
+        ? dispatches 
+        : dispatches.filter(item => item.project === activeProject);
+
+      if (filtered.length > 0) {
+        document.getElementById('infoCustomer').textContent = filtered[0].customer || '-';
+        document.getElementById('infoProject').textContent = activeProject === "全部地點" ? "全部工程彙整" : activeProject;
+        document.getElementById('infoMaterial').textContent = filtered[0].material || '-';
+        document.getElementById('pageHeadingTitle').textContent = activeProject === "全部地點" ? "現場出貨過磅" : activeProject;
+      } else {
+        document.getElementById('infoProject').textContent = activeProject;
+      }
+
+      filtered.forEach((item, index) => {
         totalAllKg += item.weight;
         const card = document.createElement('div');
         card.className = 'truck-card';
@@ -154,6 +259,8 @@
         container.appendChild(card);
       });
 
+      const totalTitle = activeProject === "全部地點" ? "全日總發貨" : `【${activeProject}】總發貨`;
+      document.querySelector('.sticky-footer .footer-title').textContent = totalTitle;
       document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
       calculate();
     }
