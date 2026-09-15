@@ -348,11 +348,22 @@
 
     async function deleteRecord(id) {
       if (!confirm("確定要刪除此筆出貨紀錄嗎？")) return;
+
+      // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除與重新計算累計
+      const originalRecords = [...currentRecords];
+      currentRecords = currentRecords.filter(r => r.id !== id);
+      renderTable();
+      document.getElementById("apiStatusText").textContent = '正在同步刪除雲端紀錄...';
+
       try {
+        // 背景同步至 Google Apps Script 試算表
         await window.ScaleApi.postAction('deleteDispatch', { id: id });
-        await loadRecords();
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
       } catch (err) {
-        alert("刪除失敗: " + err.message);
+        // 若雲端刪除失敗則自動回滾復原
+        alert("雲端同步刪除失敗: " + err.message);
+        currentRecords = originalRecords;
+        renderTable();
       }
     }
 
