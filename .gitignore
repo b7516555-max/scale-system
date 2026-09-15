@@ -2,3 +2,4 @@
 scale.db
 .DS_Store
 *.log
+deploy.js
