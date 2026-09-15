@@ -1,11 +1,13 @@
-﻿/**
+/**
  * api-config.js: 全域 API 與金鑰管理器 (支援 GAS Web App 與 本地模式)
  */
 (function() {
   const STORAGE_API_KEY = 'scale_gas_api_url';
   const STORAGE_ADMIN_KEY = 'scale_admin_key';
 
-  // 取得 API Base URL (優先順序: URL 參數 > localStorage)
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyI_iwjcAt55h3fJJ6_cOH2uTibyhjxdB84KxyiYJk2ZFxsLVjyjGe6wVfrMGaCKytYBQ/exec';
+
+  // 取得 API Base URL (優先順序: URL 參數 > localStorage > 預設網址)
   function getApiBaseUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     const paramApi = urlParams.get('api');
@@ -13,7 +15,7 @@
       localStorage.setItem(STORAGE_API_KEY, paramApi.trim());
       return paramApi.trim();
     }
-    return localStorage.getItem(STORAGE_API_KEY) || '';
+    return localStorage.getItem(STORAGE_API_KEY) || DEFAULT_GAS_URL;
   }
 
   function setApiBaseUrl(url) {
