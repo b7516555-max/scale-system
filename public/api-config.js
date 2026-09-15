@@ -66,7 +66,27 @@
       throw new Error('HTTP 錯誤: ' + res.status);
     }
     const result = await res.json();
-    return result.data || [];
+    const list = result.data || [];
+    // 清理時間格式，去除如 Sat Dec 30 1899 ... GMT+0800 (台北標準時間) 等試算表預設長字串
+    return list.map(item => ({
+      ...item,
+      exit_time: formatSimpleTime(item.exit_time)
+    }));
+  }
+
+  // 格式化時間為 HH:mm 簡易顯示 (例如: 10:10)
+  function formatSimpleTime(val) {
+    if (!val) return '-';
+    const str = String(val).trim();
+    if (!str || str === '-') return '-';
+    // 若包含時間部分 (如 1899 ... 10:10:00 GMT... 或 10:10:00 或 10:10)
+    const match = str.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (match) {
+      const hh = match[1].padStart(2, '0');
+      const mm = match[2];
+      return `${hh}:${mm}`;
+    }
+    return str;
   }
 
   // 發起 POST 請求 (新增或刪除)
