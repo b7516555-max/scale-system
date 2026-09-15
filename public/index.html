@@ -92,10 +92,94 @@
       background: #e2e8f0;
       border-color: #718096;
     }
+
+    /* 手機版適配樣式 (在手機開啟編輯版時自適應流暢排版) */
+    .table-scroll-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-top: 14px;
+    }
+    .badge-edit-mode {
+      background: #0052cc;
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .nav-switch-btn {
+      background: #edf2f7;
+      border: 1px solid #cbd5e0;
+      color: #2d3748;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        margin: 10px;
+        padding-bottom: 30px;
+      }
+      .card {
+        padding: 14px 12px;
+        margin-bottom: 12px;
+      }
+      .server-setting-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .server-setting-bar input {
+        width: 100%;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .range-box {
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 0.88rem;
+      }
+      .range-box input {
+        width: 55px;
+      }
+      .summary-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 0.95rem;
+      }
+      .btn-primary {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+      }
+      th, td {
+        padding: 8px 6px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+      }
+    }
   </style>
   <script src="api-config.js"></script>
 </head>
 <body>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <h1 style="margin: 0; font-size: 1.3rem; color: #1a202c; font-weight: 800;">地磅調度出貨系統</h1>
+      <span class="badge-edit-mode">✍️ 編輯版</span>
+    </div>
+    <div>
+      <a href="view.html" class="nav-switch-btn">📱 前往「查詢版」</a>
+    </div>
+  </div>
 
   <div class="server-setting-bar">
     <div style="display: flex; align-items: center; gap: 8px;">
@@ -159,22 +243,24 @@
       <button class="btn-secondary" onclick="toggleSelectAll(false)">清除選取</button>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th width="40"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this.checked)"></th>
-          <th width="60">車次</th>
-          <th>客戶 / 工程 / 料別</th>
-          <th>司機</th>
-          <th>車牌</th>
-          <th>實重 (KG)</th>
-          <th>累計重量 (KG)</th>
-          <th>出場時間</th>
-          <th width="60">操作</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
+    <div class="table-scroll-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this.checked)"></th>
+            <th width="60">車次</th>
+            <th>客戶 / 工程 / 料別</th>
+            <th>司機</th>
+            <th>車牌</th>
+            <th>實重 (KG)</th>
+            <th>累計重量 (KG)</th>
+            <th>出場時間</th>
+            <th width="60">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
 
     <div class="summary-bar">
       <div>全部總重：<span id="allTotalKg" style="font-weight: bold;">0</span> KG (<span id="allTotalTon" style="font-weight: bold;">0.00</span> 噸)</div>
