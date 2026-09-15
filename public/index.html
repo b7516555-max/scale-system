@@ -213,12 +213,12 @@
     <div class="grid">
       <div class="autocomplete-wrap">
         <label>車牌 (輸入數字4碼快選)</label>
-        <input type="text" id="plate" placeholder="例如輸入 0931 或 6663" autocomplete="off" oninput="onPlateInput(this.value)" onfocus="onPlateInput(this.value)">
+        <input type="text" id="plate" placeholder="例如輸入 0931 或 6663" autocomplete="off" oninput="onPlateInput(this.value)" onfocus="onPlateInput(this.value)" onclick="onPlateInput(this.value)">
         <div id="plateDropdown" class="autocomplete-list"></div>
       </div>
       <div class="autocomplete-wrap">
         <label>司機姓名 (點選名單或輸入)</label>
-        <input type="text" id="driver" placeholder="點擊看名單或輸入快選" autocomplete="off" oninput="onDriverInput(this.value)" onfocus="onDriverInput(this.value)">
+        <input type="text" id="driver" placeholder="點擊看名單或輸入快選" autocomplete="off" oninput="onDriverInput(this.value)" onfocus="onDriverInput(this.value)" onclick="onDriverInput(this.value)">
         <div id="driverDropdown" class="autocomplete-list"></div>
       </div>
       <div><label>實重 (KG)</label><input type="number" id="weight" placeholder="例如: 44080"></div>
@@ -301,10 +301,12 @@
     ];
 
     function onPlateInput(val) {
-      const keyword = val.trim().toUpperCase();
+      const keyword = (val || "").trim().toUpperCase();
       const dropdown = document.getElementById("plateDropdown");
-      if (!keyword) { dropdown.style.display = "none"; return; }
-      const matches = presetVehicles.filter(v => v.plate.replace('-', '').includes(keyword) || v.plate.includes(keyword));
+      const matches = presetVehicles.filter(v => {
+        if (!keyword) return true;
+        return v.plate.replace('-', '').includes(keyword) || v.plate.includes(keyword);
+      });
       if (matches.length === 0) { dropdown.style.display = "none"; return; }
 
       dropdown.innerHTML = "";
@@ -312,6 +314,7 @@
         const div = document.createElement("div");
         div.className = "autocomplete-item";
         div.innerHTML = `<span>${item.plate}</span><span style="color:#718096">${item.driver || ''}</span>`;
+        div.onmousedown = (e) => { e.preventDefault(); }; // 防止 blur
         div.onclick = () => {
           document.getElementById("plate").value = item.plate;
           if (item.driver) document.getElementById("driver").value = item.driver;
@@ -324,7 +327,7 @@
     }
 
     function onDriverInput(val) {
-      const keyword = val.trim();
+      const keyword = (val || "").trim();
       const dropdown = document.getElementById("driverDropdown");
       const matches = presetVehicles.filter(v => v.driver && (v.driver.includes(keyword) || !keyword));
       if (matches.length === 0) { dropdown.style.display = "none"; return; }
@@ -334,6 +337,7 @@
         const div = document.createElement("div");
         div.className = "autocomplete-item";
         div.innerHTML = `<span><b>${item.driver}</b></span><span style="color:#718096">${item.plate}</span>`;
+        div.onmousedown = (e) => { e.preventDefault(); }; // 防止 blur
         div.onclick = () => {
           document.getElementById("driver").value = item.driver;
           if (item.plate) document.getElementById("plate").value = item.plate;
