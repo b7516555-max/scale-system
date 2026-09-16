@@ -209,7 +209,7 @@
   </div>
 
   <div class="card">
-    <h2>單車次過磅紀錄新增</h2>
+    <h2 id="entryFormTitle">單車次過磅紀錄新增</h2>
     <div class="grid">
       <div class="autocomplete-wrap">
         <label>車牌 (輸入數字4碼快選)</label>
@@ -227,7 +227,8 @@
         <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
       </div>
     </div>
-    <button class="btn-primary" onclick="submitEntry()">儲存並發送</button>
+    <button class="btn-primary" id="submitEntryButton" onclick="submitEntry()">儲存並發送</button>
+    <button class="btn-secondary" id="cancelEditButton" style="display:none; margin-left:8px;" onclick="cancelEdit()">取消編輯</button>
   </div>
 
   <div class="card">
@@ -519,7 +520,10 @@
           <td>${r.weight.toLocaleString()}</td>
           <td>${runningTotal.toLocaleString()}</td>
           <td>${r.exit_time}</td>
-          <td><button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button></td>
+          <td>
+            <button class="btn-secondary" style="padding:4px 8px; margin-right:4px;" onclick="editRecord(${r.id})">編輯</button>
+            <button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -558,6 +562,43 @@
       calculateSelected();
     }
 
+    let editingRecordId = null;
+
+    function resetEntryForm() {
+      editingRecordId = null;
+      document.getElementById("entryFormTitle").textContent = "單車次過磅紀錄新增";
+      document.getElementById("submitEntryButton").textContent = "儲存並發送";
+      document.getElementById("cancelEditButton").style.display = "none";
+      document.getElementById("driver").value = "";
+      document.getElementById("plate").value = "";
+      document.getElementById("weight").value = "";
+      document.getElementById("exit_time").value = "";
+    }
+
+    function editRecord(id) {
+      const record = currentRecords.find(r => Number(r.id) === Number(id));
+      if (!record) {
+        alert("找不到這筆車次紀錄，請重新整理後再試。");
+        return;
+      }
+      editingRecordId = Number(id);
+      document.getElementById("customer").value = record.customer || "";
+      document.getElementById("project").value = record.project || "";
+      document.getElementById("material").value = record.material || "";
+      document.getElementById("driver").value = record.driver === "-" ? "" : (record.driver || "");
+      document.getElementById("plate").value = record.plate || "";
+      document.getElementById("weight").value = record.weight || "";
+      document.getElementById("exit_time").value = record.exit_time === "-" ? "" : (record.exit_time || "");
+      document.getElementById("entryFormTitle").textContent = `編輯車次 #${record.id}`;
+      document.getElementById("submitEntryButton").textContent = "儲存修改";
+      document.getElementById("cancelEditButton").style.display = "inline-block";
+      document.getElementById("plate").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function cancelEdit() {
+      resetEntryForm();
+    }
+
     async function submitEntry() {
       let rawTime = document.getElementById("exit_time").value.trim();
       let cleanTime = rawTime.replace(/[^0-9]/g, '');
@@ -584,11 +625,12 @@
       }
 
       try {
-        await window.ScaleApi.postAction('addDispatch', payload);
-        document.getElementById("driver").value = "";
-        document.getElementById("plate").value = "";
-        document.getElementById("weight").value = "";
-        document.getElementById("exit_time").value = "";
+        if (editingRecordId !== null) {
+          await window.ScaleApi.postAction('updateDispatch', { id: editingRecordId, ...payload });
+        } else {
+          await window.ScaleApi.postAction('addDispatch', payload);
+        }
+        resetEntryForm();
         await loadRecords();
       } catch (err) {
         alert("儲存失敗: " + err.message);
@@ -611,6 +653,10 @@
       } catch (err) {
         // 若雲端刪除失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
+        currentRecords = originalRecords;
+        renderTable();
+      }
+    }
     async function batchDeleteSelected() {
       const selectedBoxes = Array.from(document.querySelectorAll('.row-select:checked'));
       if (selectedBoxes.length === 0) {
