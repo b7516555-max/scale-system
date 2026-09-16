@@ -184,11 +184,8 @@
   <div class="server-setting-bar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span class="badge-cloud">雲端後端</span>
-      <span>API 伺服器：</span>
-      <input type="text" id="apiServerInput" placeholder="本機預設同源，或輸入 https://your-backend.onrender.com">
-      <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="saveApiServer()">儲存設定</button>
+      <span id="apiStatusText">雲端連線檢查中...</span>
     </div>
-    <div style="font-size: 0.8rem; color: #718096;" id="apiStatusText">就緒</div>
   </div>
 
   <!-- 方案 1：工程地點分頁標籤切換列 -->
@@ -384,21 +381,7 @@
     let knownProjects = new Map(); // project -> { customer, material, count }
 
     function initApiConfig() {
-      const input = document.getElementById("apiServerInput");
-      const current = window.ScaleApi ? window.ScaleApi.getBaseUrl() : '';
-      input.value = current;
-      if (current) {
-        document.getElementById("apiStatusText").textContent = '連線至: ' + current;
-      }
-    }
-
-    function saveApiServer() {
-      const val = document.getElementById("apiServerInput").value.trim();
-      if (window.ScaleApi) {
-        window.ScaleApi.setBaseUrl(val);
-        document.getElementById("apiStatusText").textContent = val ? '已設定連線至: ' + val : '已恢復為本機/同源 API';
-        loadRecords();
-      }
+      document.getElementById("apiStatusText").textContent = "雲端連線檢查中...";
     }
 
     function updateKnownProjects() {
@@ -491,10 +474,10 @@
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        document.getElementById("apiStatusText").textContent = "雲端已連線";
       } catch (err) {
         console.error('讀取失敗:', err);
-        document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
+        document.getElementById("apiStatusText").textContent = "雲端未連線";
       }
     }
 
@@ -649,7 +632,7 @@
       try {
         // 背景同步至 Google Apps Script 試算表
         await window.ScaleApi.postAction('deleteDispatch', { id: id });
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        document.getElementById("apiStatusText").textContent = "雲端已連線";
       } catch (err) {
         // 若雲端刪除失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
@@ -679,7 +662,7 @@
         for (const id of targetIds) {
           await window.ScaleApi.postAction('deleteDispatch', { id: id });
         }
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        document.getElementById("apiStatusText").textContent = "雲端已連線";
         updateKnownProjects();
         renderProjectTabs();
       } catch (err) {
