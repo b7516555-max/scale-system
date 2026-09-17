@@ -184,8 +184,11 @@
   <div class="server-setting-bar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span class="badge-cloud">雲端後端</span>
-      <span id="apiStatusText">雲端連線檢查中...</span>
+      <span>API 伺服器：</span>
+      <input type="text" id="apiServerInput" placeholder="本機預設同源，或輸入 https://your-backend.onrender.com">
+      <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="saveApiServer()">儲存設定</button>
     </div>
+    <div style="font-size: 0.8rem; color: #718096;" id="apiStatusText">就緒</div>
   </div>
 
   <!-- 方案 1：工程地點分頁標籤切換列 -->
@@ -206,7 +209,7 @@
   </div>
 
   <div class="card">
-    <h2 id="entryFormTitle">單車次過磅紀錄新增</h2>
+    <h2>單車次過磅紀錄新增</h2>
     <div class="grid">
       <div class="autocomplete-wrap">
         <label>車牌 (輸入數字4碼快選)</label>
@@ -224,8 +227,7 @@
         <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
       </div>
     </div>
-    <button class="btn-primary" id="submitEntryButton" onclick="submitEntry()">儲存並發送</button>
-    <button class="btn-secondary" id="cancelEditButton" style="display:none; margin-left:8px;" onclick="cancelEdit()">取消編輯</button>
+    <button class="btn-primary" onclick="submitEntry()">儲存並發送</button>
   </div>
 
   <div class="card">
@@ -293,9 +295,10 @@
       { plate: "KEP-8398", driver: "燒酒" }, { plate: "KEW-2792", driver: "陳平和" },
       { plate: "KEH-5955", driver: "泰" }, { plate: "KLB-7158", driver: "" },
       { plate: "KLK-5878", driver: "阿廷" }, { plate: "KEM-3076", driver: "" },
-      { plate: "KET-7537", driver: "阿賢" }, { plate: "KLM-0929", driver: "" },
-      { plate: "KLE-9550", driver: "" }, { plate: "KLL-2789", driver: "" },
-      { plate: "KLN-7963", driver: "" }
+      { plate: "KLA-7698", driver: "阿賢" }, { plate: "KLD-2671", driver: "阿ㄒㄧㄢˋ" },
+      { plate: "KLN-8553", driver: "吸管" }, { plate: "KLG-8675", driver: "阿義" },
+      { plate: "KLM-0929", driver: "" }, { plate: "KLE-9550", driver: "" },
+      { plate: "KLL-2789", driver: "" }, { plate: "KLN-7963", driver: "" }
     ];
 
     function onPlateInput(val) {
@@ -381,7 +384,21 @@
     let knownProjects = new Map(); // project -> { customer, material, count }
 
     function initApiConfig() {
-      document.getElementById("apiStatusText").textContent = "雲端連線檢查中...";
+      const input = document.getElementById("apiServerInput");
+      const current = window.ScaleApi ? window.ScaleApi.getBaseUrl() : '';
+      input.value = current;
+      if (current) {
+        document.getElementById("apiStatusText").textContent = '連線至: ' + current;
+      }
+    }
+
+    function saveApiServer() {
+      const val = document.getElementById("apiServerInput").value.trim();
+      if (window.ScaleApi) {
+        window.ScaleApi.setBaseUrl(val);
+        document.getElementById("apiStatusText").textContent = val ? '已設定連線至: ' + val : '已恢復為本機/同源 API';
+        loadRecords();
+      }
     }
 
     function updateKnownProjects() {
@@ -474,10 +491,10 @@
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
-        document.getElementById("apiStatusText").textContent = "雲端已連線";
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
       } catch (err) {
         console.error('讀取失敗:', err);
-        document.getElementById("apiStatusText").textContent = "雲端未連線";
+        document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
       }
     }
 
@@ -503,10 +520,7 @@
           <td>${r.weight.toLocaleString()}</td>
           <td>${runningTotal.toLocaleString()}</td>
           <td>${r.exit_time}</td>
-          <td>
-            <button class="btn-secondary" style="padding:4px 8px; margin-right:4px;" onclick="editRecord(${r.id})">編輯</button>
-            <button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button>
-          </td>
+          <td><button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -545,43 +559,6 @@
       calculateSelected();
     }
 
-    let editingRecordId = null;
-
-    function resetEntryForm() {
-      editingRecordId = null;
-      document.getElementById("entryFormTitle").textContent = "單車次過磅紀錄新增";
-      document.getElementById("submitEntryButton").textContent = "儲存並發送";
-      document.getElementById("cancelEditButton").style.display = "none";
-      document.getElementById("driver").value = "";
-      document.getElementById("plate").value = "";
-      document.getElementById("weight").value = "";
-      document.getElementById("exit_time").value = "";
-    }
-
-    function editRecord(id) {
-      const record = currentRecords.find(r => Number(r.id) === Number(id));
-      if (!record) {
-        alert("找不到這筆車次紀錄，請重新整理後再試。");
-        return;
-      }
-      editingRecordId = Number(id);
-      document.getElementById("customer").value = record.customer || "";
-      document.getElementById("project").value = record.project || "";
-      document.getElementById("material").value = record.material || "";
-      document.getElementById("driver").value = record.driver === "-" ? "" : (record.driver || "");
-      document.getElementById("plate").value = record.plate || "";
-      document.getElementById("weight").value = record.weight || "";
-      document.getElementById("exit_time").value = record.exit_time === "-" ? "" : (record.exit_time || "");
-      document.getElementById("entryFormTitle").textContent = `編輯車次 #${record.id}`;
-      document.getElementById("submitEntryButton").textContent = "儲存修改";
-      document.getElementById("cancelEditButton").style.display = "inline-block";
-      document.getElementById("plate").scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
-    function cancelEdit() {
-      resetEntryForm();
-    }
-
     async function submitEntry() {
       let rawTime = document.getElementById("exit_time").value.trim();
       let cleanTime = rawTime.replace(/[^0-9]/g, '');
@@ -608,12 +585,11 @@
       }
 
       try {
-        if (editingRecordId !== null) {
-          await window.ScaleApi.postAction('updateDispatch', { id: editingRecordId, ...payload });
-        } else {
-          await window.ScaleApi.postAction('addDispatch', payload);
-        }
-        resetEntryForm();
+        await window.ScaleApi.postAction('addDispatch', payload);
+        document.getElementById("driver").value = "";
+        document.getElementById("plate").value = "";
+        document.getElementById("weight").value = "";
+        document.getElementById("exit_time").value = "";
         await loadRecords();
       } catch (err) {
         alert("儲存失敗: " + err.message);
@@ -632,14 +608,10 @@
       try {
         // 背景同步至 Google Apps Script 試算表
         await window.ScaleApi.postAction('deleteDispatch', { id: id });
-        document.getElementById("apiStatusText").textContent = "雲端已連線";
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
       } catch (err) {
         // 若雲端刪除失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
-        currentRecords = originalRecords;
-        renderTable();
-      }
-    }
     async function batchDeleteSelected() {
       const selectedBoxes = Array.from(document.querySelectorAll('.row-select:checked'));
       if (selectedBoxes.length === 0) {
@@ -662,7 +634,7 @@
         for (const id of targetIds) {
           await window.ScaleApi.postAction('deleteDispatch', { id: id });
         }
-        document.getElementById("apiStatusText").textContent = "雲端已連線";
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
         updateKnownProjects();
         renderProjectTabs();
       } catch (err) {
