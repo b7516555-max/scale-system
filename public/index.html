@@ -612,6 +612,11 @@
       } catch (err) {
         // 若雲端刪除失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
+        currentRecords = originalRecords;
+        renderTable();
+      }
+    }
+
     async function batchDeleteSelected() {
       const selectedBoxes = Array.from(document.querySelectorAll('.row-select:checked'));
       if (selectedBoxes.length === 0) {
