@@ -23,7 +23,11 @@
     .highlight { color: #c53030; font-weight: 700; font-size: 1.15rem; }
     .range-box { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; }
     .range-box input { width: 75px; }
-    .del-btn { background: none; border: none; color: #e53e3e; cursor: pointer; font-weight: 600; }
+    .del-btn { background: none; border: none; color: #e53e3e; cursor: pointer; font-weight: 600; padding: 2px 4px; }
+    .del-btn:hover { text-decoration: underline; }
+    .edit-row-btn { background: none; border: none; color: #0052cc; cursor: pointer; font-weight: 600; padding: 2px 4px; margin-right: 4px; }
+    .edit-row-btn:hover { text-decoration: underline; }
+    .editing-highlight { background-color: #ebf8ff !important; border-left: 3px solid #0052cc !important; }
     .autocomplete-wrap { position: relative; }
     .autocomplete-list {
       position: absolute; top: 100%; left: 0; right: 0; background: white;
@@ -232,11 +236,12 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="dispatchFormCard">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-bottom: 12px;">
-      <h2 style="margin: 0; border: none; padding: 0;">單車次過磅紀錄新增</h2>
+      <h2 style="margin: 0; border: none; padding: 0;" id="dispatchFormTitle">單車次過磅紀錄新增</h2>
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 5px 12px; background: #ebf8ff; color: #0052cc; border: 1px solid #bee3f8;" onclick="openVehicleManager()">⚙️ 管理司機車牌名單</button>
     </div>
+    <input type="hidden" id="editDispatchId" value="">
     <div class="grid">
       <div class="autocomplete-wrap">
         <label>車牌 (輸入數字4碼快選)</label>
@@ -254,7 +259,10 @@
         <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
       </div>
     </div>
-    <button class="btn-primary" onclick="submitEntry()">儲存並發送</button>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn-primary" id="btnSubmitDispatch" onclick="submitEntry()">儲存並發送</button>
+      <button class="btn-secondary" id="btnCancelEditDispatch" style="display: none;" onclick="cancelEditEntry()">取消編輯</button>
+    </div>
   </div>
 
   <div class="card">
@@ -283,7 +291,7 @@
             <th>實重 (KG)</th>
             <th>累計重量 (KG)</th>
             <th>出場時間</th>
-            <th width="60">操作</th>
+            <th width="95" style="text-align: center;">操作</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -565,6 +573,7 @@
     let currentRecords = [];
     let activeProject = "全部地點";
     let knownProjects = new Map(); // project -> { customer, material, count }
+    let editingDispatchId = null; // 當前正在編輯的車次 ID
 
     function initApiConfig() {
       const input = document.getElementById("apiServerInput");
@@ -694,6 +703,9 @@
       displayRecords.forEach((r, idx) => {
         runningTotal += r.weight;
         const tr = document.createElement("tr");
+        if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
+          tr.className = "editing-highlight";
+        }
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
           <td>${idx + 1}</td>
@@ -703,7 +715,10 @@
           <td>${r.weight.toLocaleString()}</td>
           <td>${runningTotal.toLocaleString()}</td>
           <td>${r.exit_time}</td>
-          <td><button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button></td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="edit-row-btn" onclick="editDispatchRecord(${r.id})">編輯</button>
+            <button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -742,6 +757,47 @@
       calculateSelected();
     }
 
+    function editDispatchRecord(id) {
+      const record = currentRecords.find(r => Number(r.id) === Number(id));
+      if (!record) {
+        alert("找不到此車次紀錄！");
+        return;
+      }
+
+      editingDispatchId = id;
+      document.getElementById("editDispatchId").value = id;
+      document.getElementById("customer").value = record.customer || "";
+      document.getElementById("project").value = record.project || "";
+      document.getElementById("material").value = record.material || "";
+      document.getElementById("driver").value = record.driver || "";
+      document.getElementById("plate").value = record.plate || "";
+      document.getElementById("weight").value = record.weight || "";
+      document.getElementById("exit_time").value = record.exit_time && record.exit_time !== '-' ? record.exit_time : "";
+
+      // 更新表單標題與按鈕文字
+      document.getElementById("dispatchFormTitle").textContent = `✏️ 編輯車次紀錄 (車牌: ${record.plate})`;
+      document.getElementById("btnSubmitDispatch").textContent = "💾 儲存修改";
+      document.getElementById("btnCancelEditDispatch").style.display = "inline-block";
+
+      // 高亮當前編輯行並平滑滾動到輸入表單
+      renderTable();
+      document.getElementById("dispatchFormCard").scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById("weight").focus();
+    }
+
+    function cancelEditEntry() {
+      editingDispatchId = null;
+      document.getElementById("editDispatchId").value = "";
+      document.getElementById("driver").value = "";
+      document.getElementById("plate").value = "";
+      document.getElementById("weight").value = "";
+      document.getElementById("exit_time").value = "";
+      document.getElementById("dispatchFormTitle").textContent = "單車次過磅紀錄新增";
+      document.getElementById("btnSubmitDispatch").textContent = "儲存並發送";
+      document.getElementById("btnCancelEditDispatch").style.display = "none";
+      renderTable();
+    }
+
     async function submitEntry() {
       let rawTime = document.getElementById("exit_time").value.trim();
       let cleanTime = rawTime.replace(/[^0-9]/g, '');
@@ -752,6 +808,7 @@
         formattedTime = '0' + cleanTime.slice(0, 1) + ':' + cleanTime.slice(1, 3);
       }
 
+      const isEditing = Boolean(editingDispatchId);
       const payload = {
         customer: document.getElementById("customer").value.trim(),
         project: document.getElementById("project").value.trim(),
@@ -767,15 +824,38 @@
         return;
       }
 
+      const submitBtn = document.getElementById("btnSubmitDispatch");
+      const originalBtnText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = isEditing ? "正在儲存修改..." : "正在儲存...";
+
       try {
-        await window.ScaleApi.postAction('addDispatch', payload);
-        document.getElementById("driver").value = "";
-        document.getElementById("plate").value = "";
-        document.getElementById("weight").value = "";
-        document.getElementById("exit_time").value = "";
+        if (isEditing) {
+          // 修改車次流程：優先嘗試 updateDispatch；若舊後端未更新則以 delete + add 相容更新
+          payload.id = editingDispatchId;
+          try {
+            await window.ScaleApi.postAction('updateDispatch', payload);
+          } catch (updateErr) {
+            console.warn("GAS 尚未部署 updateDispatch，切換為相容模式更新...", updateErr);
+            await window.ScaleApi.postAction('deleteDispatch', { id: editingDispatchId });
+            await window.ScaleApi.postAction('addDispatch', payload);
+          }
+          alert("車次紀錄已成功更新！");
+          cancelEditEntry();
+        } else {
+          // 新增車次流程
+          await window.ScaleApi.postAction('addDispatch', payload);
+          document.getElementById("driver").value = "";
+          document.getElementById("plate").value = "";
+          document.getElementById("weight").value = "";
+          document.getElementById("exit_time").value = "";
+        }
         await loadRecords();
       } catch (err) {
-        alert("儲存失敗: " + err.message);
+        alert((isEditing ? "修改失敗: " : "儲存失敗: ") + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = isEditing ? "💾 儲存修改" : "儲存並發送";
       }
     }
 
