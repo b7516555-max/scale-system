@@ -888,27 +888,84 @@
       }
 
       const targetIds = selectedBoxes.map(cb => Number(cb.dataset.id)).filter(Boolean);
+      if (targetIds.length === 0) {
+        alert("找不到所選紀錄的 ID！");
+        return;
+      }
+
       if (!confirm(`確定要一次刪除已勾選的 ${targetIds.length} 筆出貨紀錄嗎？\n(此動作將從 Google 試算表中同步移除)`)) return;
 
-      // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除全部勾選項目
-      const originalRecords = [...currentRecords];
-      const targetIdSet = new Set(targetIds);
-      currentRecords = currentRecords.filter(r => !targetIdSet.has(r.id));
-      renderTable();
-      document.getElementById("apiStatusText").textContent = `正在批次刪除 ${targetIds.length} 筆雲端紀錄...`;
+      const deleteBtn = document.querySelector("button[onclick='batchDeleteSelected()']");
+      if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = '⏳ 刪除中...';
+      }
 
+      const statusEl = document.getElementById("apiStatusText");
+      if (statusEl) statusEl.textContent = `準備刪除 ${targetIds.length} 筆雲端紀錄...`;
+
+      // 先嘗試 GAS 批次端點 batchDeleteDispatches (若後端支援則 1 次請求搞定)
+      let batchSuccess = false;
       try {
-        // 背景同步至 Google Apps Script 試算表 (依序刪除各 ID)
-        for (const id of targetIds) {
-          await window.ScaleApi.postAction('deleteDispatch', { id: id });
+        const batchRes = await window.ScaleApi.postAction('batchDeleteDispatches', { ids: targetIds });
+        if (batchRes && batchRes.success) {
+          batchSuccess = true;
         }
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+      } catch (e) {
+        // 若後端尚未更新 batchDeleteDispatches，平滑切換為逐筆並行批次刪除
+        batchSuccess = false;
+      }
+
+      let deletedIds = [];
+      let failedIds = [];
+
+      if (batchSuccess) {
+        deletedIds = targetIds;
+      } else {
+        // 平行分組刪除 (每組 3 個請求，避免超過 GAS 並發限制與造成超時)
+        const CHUNK_SIZE = 3;
+        for (let i = 0; i < targetIds.length; i += CHUNK_SIZE) {
+          const chunk = targetIds.slice(i, i + CHUNK_SIZE);
+          if (statusEl) statusEl.textContent = `正在刪除雲端紀錄 (${Math.min(i + chunk.length, targetIds.length)}/${targetIds.length})...`;
+          
+          const results = await Promise.allSettled(
+            chunk.map(id => window.ScaleApi.postAction('deleteDispatch', { id: id }))
+          );
+
+          results.forEach((res, idx) => {
+            const id = chunk[idx];
+            if (res.status === 'fulfilled' && res.value && res.value.success) {
+              deletedIds.push(id);
+            } else {
+              failedIds.push(id);
+            }
+          });
+        }
+      }
+
+      // 移除成功刪除的項目
+      if (deletedIds.length > 0) {
+        const deletedSet = new Set(deletedIds);
+        currentRecords = currentRecords.filter(r => !deletedSet.has(r.id));
         updateKnownProjects();
         renderProjectTabs();
-      } catch (err) {
-        alert("批次刪除失敗: " + err.message);
-        currentRecords = originalRecords;
         renderTable();
+      }
+
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = '🗑️ 刪除已勾選車次';
+      }
+
+      const checkAll = document.getElementById("checkAll");
+      if (checkAll) checkAll.checked = false;
+
+      if (statusEl) statusEl.textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+
+      if (failedIds.length > 0) {
+        alert(`已成功刪除 ${deletedIds.length} 筆，但有 ${failedIds.length} 筆刪除失敗或未在試算表中找到。`);
+      } else {
+        alert(`成功刪除 ${deletedIds.length} 筆紀錄！`);
       }
     }
 

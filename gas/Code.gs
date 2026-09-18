@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 地磅調度出貨管理系統 - Google Apps Script (GAS) 後端 Web API
  * 試算表結構：ID | 客戶名稱 | 工程名稱/地點 | 品名/料別 | 司機姓名 | 車牌號碼 | 實重(KG) | 出場時間 | 建立時間
  */
@@ -137,34 +137,46 @@ function doPost(e) {
  });
  }
 
- // 2. 刪除指定 ID 紀錄
- if (action === deleteDispatch) {
- const targetId = Number(payload.id);
- if (!targetId) {
- return createJsonResponse({ success: false, error: 請指定要刪除的紀錄 ID });
- }
+    // 2. 刪除指定 ID 紀錄 (單筆或批次)
+    if (action === 'deleteDispatch' || action === 'batchDeleteDispatches') {
+      const targetIds = Array.isArray(payload.ids)
+        ? payload.ids.map(Number).filter(Boolean)
+        : (payload.id ? [Number(payload.id)] : []);
 
- const lastRow = sheet.getLastRow();
- if (lastRow <= 1) {
- return createJsonResponse({ success: false, error: 無任何紀錄可刪除 });
- }
+      if (targetIds.length === 0) {
+        return createJsonResponse({ success: false, error: '請指定要刪除的紀錄 ID' });
+      }
 
- const idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
- let deleted = false;
- for (let i = idValues.length - 1; i >= 0; i--) {
- if (Number(idValues[i][0]) === targetId) {
- sheet.deleteRow(i + 2); // 第 2 列開始是資料
- deleted = true;
- break;
- }
- }
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        return createJsonResponse({ success: false, error: '無任何紀錄可刪除' });
+      }
 
- if (deleted) {
- return createJsonResponse({ success: true, message: 紀錄已成功刪除, id: targetId });
- } else {
- return createJsonResponse({ success: false, error: 找不到指定的紀錄 ID:  + targetId });
- }
- }
+      const idTargetSet = {};
+      targetIds.forEach(id => { idTargetSet[id] = true; });
+
+      const idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      let deletedCount = 0;
+      // 從最後一列往前刪除，避免列索引位移影響
+      for (let i = idValues.length - 1; i >= 0; i--) {
+        const rowId = Number(idValues[i][0]);
+        if (idTargetSet[rowId]) {
+          sheet.deleteRow(i + 2); // 第 2 列開始是資料列
+          deletedCount++;
+        }
+      }
+
+      if (deletedCount > 0) {
+        return createJsonResponse({ 
+          success: true, 
+          message: `已成功刪除 ${deletedCount} 筆紀錄`, 
+          deletedCount: deletedCount, 
+          deletedIds: targetIds 
+        });
+      } else {
+        return createJsonResponse({ success: false, error: '找不到指定的紀錄 ID: ' + targetIds.join(', ') });
+      }
+    }
 
  return createJsonResponse({ success: false, error: 未知的 POST 操作:  + action });
 
