@@ -237,24 +237,31 @@
       <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
     </div>
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
       <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
       <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
       <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
       <div>
         <label style="display:flex; justify-content:space-between;">
-          <span>預計需求量 (噸)</span>
+          <span>預計需求總量 (噸)</span>
           <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
         </label>
-        <input type="number" step="0.1" id="projectTarget" placeholder="例如: 150 (噸)" oninput="onTargetInput(this.value)">
+        <input type="number" step="0.1" id="projectTarget" placeholder="例如: 150" oninput="onTargetInput(this.value)">
+      </div>
+      <div>
+        <label style="display:flex; justify-content:space-between;">
+          <span style="color:#c53030; font-weight:700;">⏳ 還要出多少 (噸)</span>
+          <span style="font-size:0.75rem; color:#718096;">可直接手key</span>
+        </label>
+        <input type="number" step="0.1" id="projectRemainingInput" placeholder="例如: 40 (或等車)" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
       </div>
     </div>
-    <div id="projectDemandStatus" style="display:none; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-top:8px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-top:8px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <span>🎯 目標需求：<b id="dispTargetTon" style="color:#2b6cb0;">0</b> 噸</span>
-        <span>🚚 已出貨：<b id="dispCurrentTon" style="color:#2d3748;">0</b> 噸</span>
-        <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.1rem; color:#c53030;">0</b> 噸</span>
-        <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#718096; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
+        <span>🎯 目標總量：<b id="dispTargetTon" style="color:#2b6cb0;">0.0</b> 噸</span>
+        <span>🚚 已出累計：<b id="dispCurrentTon" style="color:#2d3748;">0.00</b> 噸</span>
+        <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.15rem; color:#c53030;">0.00</b> 噸</span>
+        <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#4a5568; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
       </div>
       <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="copyProjectShareLink()">📋 複製手機版連結傳給主任</button>
     </div>
@@ -756,6 +763,27 @@
       setProjectTarget(activeProject, val);
     }
 
+    // 當使用者直接在「還要出多少 (噸)」手 key 時，自動反推預計需求總量 = 當前已出噸數 + 還要出的噸數
+    function onRemainingInput(val) {
+      if (!activeProject) return;
+      const siteRecords = currentRecords.filter(r => r.project === activeProject);
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      const remNum = parseFloat(val);
+      if (!isNaN(remNum) && remNum >= 0) {
+        const calculatedTarget = Math.round((currentTon + remNum) * 100) / 100;
+        localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
+        const targetInput = document.getElementById("projectTarget");
+        if (targetInput) targetInput.value = calculatedTarget > 0 ? calculatedTarget : "";
+      } else if (!val) {
+        localStorage.removeItem('scale_target_' + activeProject);
+        const targetInput = document.getElementById("projectTarget");
+        if (targetInput) targetInput.value = "";
+      }
+      updateDemandStatus();
+    }
+
     function setTargetPrompt() {
       if (!activeProject) {
         alert("請先選擇或輸入工程地點！");
@@ -783,11 +811,18 @@
 
       const targetTon = getProjectTarget(activeProject);
       const targetInput = document.getElementById("projectTarget");
+      const remainingInput = document.getElementById("projectRemainingInput");
+
+      document.getElementById("dispCurrentTon").textContent = currentTon.toFixed(2);
+
       if (targetTon > 0) {
         if (targetInput && document.activeElement !== targetInput) {
           targetInput.value = targetTon;
         }
-        const remainingTon = Math.max(0, targetTon - currentTon);
+        const remainingTon = Math.max(0, Math.round((targetTon - currentTon) * 100) / 100);
+        if (remainingInput && document.activeElement !== remainingInput) {
+          remainingInput.value = remainingTon > 0 ? remainingTon : "0";
+        }
         
         // 估計平均每車重量推算還需幾車
         let avgPerTruck = siteRecords.length > 0 ? (currentTon / siteRecords.length) : 21.0;
@@ -795,11 +830,10 @@
         const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
 
         document.getElementById("dispTargetTon").textContent = targetTon.toFixed(1);
-        document.getElementById("dispCurrentTon").textContent = currentTon.toFixed(2);
         
         const remEl = document.getElementById("dispRemainingTon");
         if (remainingTon <= 0) {
-          remEl.textContent = "0.0 (已達標)";
+          remEl.textContent = "0.00 (已達標)";
           remEl.style.color = "#38a169";
           document.getElementById("dispRemainingTrucks").textContent = "🎉 出貨完畢";
         } else {
@@ -812,7 +846,13 @@
         if (targetInput && document.activeElement !== targetInput) {
           targetInput.value = "";
         }
-        statusBox.style.display = "none";
+        if (remainingInput && document.activeElement !== remainingInput) {
+          remainingInput.value = "";
+        }
+        document.getElementById("dispTargetTon").textContent = "0.0";
+        document.getElementById("dispRemainingTon").textContent = "0.00";
+        document.getElementById("dispRemainingTrucks").textContent = "尚未設定需求量";
+        statusBox.style.display = "flex";
       }
     }
 
@@ -825,7 +865,8 @@
         if (meta.material) document.getElementById("material").value = meta.material;
       }
       const tVal = getProjectTarget(pName);
-      document.getElementById("projectTarget").value = tVal > 0 ? tVal : "";
+      const targetInput = document.getElementById("projectTarget");
+      if (targetInput) targetInput.value = tVal > 0 ? tVal : "";
       updateDemandStatus();
       renderProjectTabs();
       renderTable();

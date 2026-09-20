@@ -314,16 +314,37 @@
 
     function mobileSetTargetPrompt() {
       if (!activeProject) return;
-      const current = getProjectTarget(activeProject);
-      const input = prompt(`請設定【${activeProject}】預計需求總量 (噸)：`, current || "100");
-      if (input !== null) {
-        const num = parseFloat(input);
-        if (num > 0) {
-          localStorage.setItem('scale_target_' + activeProject, num);
-        } else {
-          localStorage.removeItem('scale_target_' + activeProject);
+      const filtered = dispatches.filter(item => item.project === activeProject);
+      const dispatchedTon = filtered.reduce((acc, item) => acc + (Number(item.weight) || 0), 0) / 1000;
+      const currentTarget = getProjectTarget(activeProject);
+      const currentRemain = currentTarget > 0 ? Math.max(0, Math.round((currentTarget - dispatchedTon) * 100) / 100) : "";
+
+      const choice = prompt(`請選擇要設定的項目：\n1. 輸入「還要出多少 (噸)」(目前已出 ${dispatchedTon.toFixed(2)} 噸)\n2. 輸入「預計需求總量 (噸)」\n\n請輸入 1 或 2：`, "1");
+      if (!choice) return;
+
+      if (choice.trim() === "1") {
+        const remInput = prompt(`【${activeProject}】目前已出 ${dispatchedTon.toFixed(2)} 噸。\n請輸入現場「還要再出多少噸」：`, currentRemain || "40");
+        if (remInput !== null) {
+          const remVal = parseFloat(remInput);
+          if (!isNaN(remVal) && remVal >= 0) {
+            const calculatedTarget = Math.round((dispatchedTon + remVal) * 100) / 100;
+            localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
+          } else {
+            localStorage.removeItem('scale_target_' + activeProject);
+          }
+          updateDemandBanner();
         }
-        updateDemandBanner();
+      } else if (choice.trim() === "2") {
+        const input = prompt(`請設定【${activeProject}】預計需求總量 (噸)：`, currentTarget || "100");
+        if (input !== null) {
+          const num = parseFloat(input);
+          if (num > 0) {
+            localStorage.setItem('scale_target_' + activeProject, num);
+          } else {
+            localStorage.removeItem('scale_target_' + activeProject);
+          }
+          updateDemandBanner();
+        }
       }
     }
 
