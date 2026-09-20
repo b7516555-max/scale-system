@@ -300,6 +300,7 @@
     let dispatches = [];
     let activeProject = "";
     let projectCounts = new Map();
+    let projectSettingsMap = {};
 
     const CACHE_KEY = 'scale_view_cache_data';
     const CACHE_TIME_KEY = 'scale_view_cache_time';
@@ -324,9 +325,14 @@
 
     function getProjectTarget(pName) {
       if (!pName) return 0;
-      const val = localStorage.getItem('scale_target_' + pName);
+      const clean = pName.trim();
+      if (projectSettingsMap[clean] && projectSettingsMap[clean].target > 0) {
+        return projectSettingsMap[clean].target;
+      }
+      const val = localStorage.getItem('scale_target_' + clean);
       return val ? parseFloat(val) : 0;
     }
+
 
     function updateDemandBanner() {
       const banner = document.getElementById('demandBanner');
@@ -397,8 +403,13 @@
 
     function getProjectWaitPhone(pName) {
       if (!pName) return '';
-      return localStorage.getItem('scale_wait_phone_' + pName) || '';
+      const clean = pName.trim();
+      if (projectSettingsMap[clean] && projectSettingsMap[clean].wait) {
+        return projectSettingsMap[clean].wait;
+      }
+      return localStorage.getItem('scale_wait_phone_' + clean) || '';
     }
+
 
     // 輔助：更新同步狀態標籤
     function updateSyncStatus(status, text) {
@@ -462,21 +473,26 @@
         const freshData = await window.ScaleApi.fetchDispatches();
 
         // 從 __SET__ 特殊記錄中讀取工程設定（目標噸數、等電話車數）
-        // 電腦端設定目標時會把設定藏在這類特殊記錄裡，不需要 GAS 新 API
         freshData.filter(r => r.plate === '__SET__').forEach(r => {
           try {
-            const cfg = JSON.parse(r.material || '{}');
-            const pName = r.customer;
+            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            const pName = (r.customer || '').trim();
             if (pName) {
+              projectSettingsMap[pName] = {
+                target: Number(cfg.target) || 0,
+                wait: String(cfg.wait || '').trim()
+              };
               if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
               if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-              else localStorage.removeItem('scale_wait_phone_' + pName);
             }
-          } catch(e) {}
+          } catch(e) {
+            console.warn('解析設定失敗:', e);
+          }
         });
 
         // 過濾掉 __SET__ 記錄，只保留真正的出貨車次
         dispatches = freshData.filter(r => r.plate !== '__SET__');
+
 
         // 存入本地快取
         try {

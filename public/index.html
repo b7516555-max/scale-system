@@ -791,7 +791,7 @@
         const payload = {
           customer: pName, project: '__SETTINGS__',
           material: settingJson, driver: '-',
-          plate: '__SET__', weight: 0, exit_time: '-'
+          plate: '__SET__', weight: 1, exit_time: '-'
         };
         if (existing) {
           payload.id = existing.id;
@@ -833,6 +833,7 @@
         if (targetInput) targetInput.value = "";
       }
       updateDemandStatus();
+      syncProjectSettingsToCloud(activeProject);
     }
 
     function setTargetPrompt() {
