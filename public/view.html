@@ -38,7 +38,9 @@
     .truck-plate { font-size: 1.05rem; font-weight: 700; color: #2d3748; }
     .truck-driver { font-size: 0.9rem; color: #718096; font-weight: 500; margin-left: 6px; }
     .truck-detail { font-size: 0.85rem; color: #718096; display: flex; justify-content: space-between; align-items: baseline; }
-    .truck-weight { font-size: 1.1rem; font-weight: 700; color: #1a202c; }
+    .truck-weight { font-size: 1.05rem; font-weight: 700; color: #1a202c; }
+    .weight-major { font-size: 1.35rem; font-weight: 800; color: #1a202c; letter-spacing: -0.5px; }
+    .weight-minor { font-size: 0.95rem; font-weight: 600; color: #4a5568; }
     .sticky-footer {
       position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; padding: 12px 16px;
       box-shadow: 0 -3px 12px rgba(0,0,0,0.12); border-top: 1px solid #e2e8f0; z-index: 99;
@@ -212,6 +214,19 @@
     function getShortTime() {
       const d = new Date();
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // 格式化車重顯示：將千位以上數字 (例如 38,510 中的 38) 稍微放大加粗
+    function formatTruckWeightHtml(weight) {
+      const num = Number(weight) || 0;
+      const str = num.toLocaleString(); // 例如 "38,510" 或 "998"
+      if (str.includes(',')) {
+        const parts = str.split(',');
+        const major = parts.slice(0, -1).join(','); // 例如 "38"
+        const minor = parts[parts.length - 1]; // 例如 "510"
+        return `<span class="weight-major">${major}</span>,<span class="weight-minor">${minor}</span> <span style="font-size:0.82rem; font-weight:600; color:#718096;">KG</span>`;
+      }
+      return `<span class="weight-major">${str}</span> <span style="font-size:0.82rem; font-weight:600; color:#718096;">KG</span>`;
     }
 
     // 1. 立即讀取本地快取 (0秒秒開)
@@ -392,7 +407,7 @@
             </div>
             <div class="truck-detail">
               <span>出廠 ${item.exit_time}</span>
-              <span class="truck-weight">${item.weight.toLocaleString()} KG</span>
+              <div class="truck-weight">${formatTruckWeightHtml(item.weight)}</div>
             </div>
           </div>
         `;
