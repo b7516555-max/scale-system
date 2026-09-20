@@ -245,9 +245,24 @@
       <div class="demand-progress-bar">
         <div class="demand-progress-fill" id="mProgressFill" style="width: 0%;"></div>
       </div>
-      <div id="mWaitPhoneAlert" style="display:none; margin-top:8px; padding:6px 10px; background:#fefcbf; border:1px solid #f6e05e; border-radius:6px; font-size:0.85rem; color:#744210; font-weight:700; align-items:center; justify-content:space-between;">
-        <span id="mWaitPhoneText">📞 等電話車數：-</span>
-        <button type="button" style="background:#fff; border:1px solid #ecc94b; color:#975a16; font-size:0.75rem; padding:2px 8px; border-radius:10px; cursor:pointer;" onclick="mobileSetWaitPhonePrompt()">修改</button>
+
+      <!-- 手機端現場調度：等電話車數直接手動輸入框 -->
+      <div style="margin-top:10px; padding:8px 10px; background:#fffff0; border:1.5px solid #ecc94b; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:0.8rem; font-weight:700; color:#b7791f;">📞 現場調度 (等電話車數)</span>
+          <span style="font-size:0.72rem; color:#a0aec0;">可直接點擊手key</span>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="mWaitPhoneInput" placeholder="例如: 2台等電話、等通知..." oninput="onMobileWaitPhoneInput(this.value)" style="flex:1; padding:6px 10px; border:1px solid #d69e2e; border-radius:6px; font-size:0.92rem; font-weight:700; color:#744210; background:#fff;">
+          <button type="button" class="btn-refresh" style="padding:6px 10px; font-weight:700; color:#c53030;" onclick="clearMobileWaitPhone()">✕</button>
+        </div>
+        <div style="display:flex; gap:4px; margin-top:6px; overflow-x:auto; padding-bottom:2px;">
+          <button type="button" class="btn-refresh" style="flex-shrink:0; font-size:0.75rem; padding:3px 8px;" onclick="applyMobileWaitPhoneTag('1台等電話')">1台等</button>
+          <button type="button" class="btn-refresh" style="flex-shrink:0; font-size:0.75rem; padding:3px 8px;" onclick="applyMobileWaitPhoneTag('2台等電話')">2台等</button>
+          <button type="button" class="btn-refresh" style="flex-shrink:0; font-size:0.75rem; padding:3px 8px;" onclick="applyMobileWaitPhoneTag('3台等電話')">3台等</button>
+          <button type="button" class="btn-refresh" style="flex-shrink:0; font-size:0.75rem; padding:3px 8px;" onclick="applyMobileWaitPhoneTag('全數等通知')">全數等</button>
+          <button type="button" class="btn-refresh" style="flex-shrink:0; font-size:0.75rem; padding:3px 8px;" onclick="applyMobileWaitPhoneTag('正常出車')">正常出</button>
+        </div>
       </div>
     </div>
   </div>
@@ -409,17 +424,11 @@
         document.getElementById('mProgressFill').style.width = '0%';
       }
 
-      // 呈現等電話狀態列
+      // 呈現等電話直接輸入框內容
       const waitPhone = getProjectWaitPhone(activeProject);
-      const waitBox = document.getElementById('mWaitPhoneAlert');
-      const waitText = document.getElementById('mWaitPhoneText');
-      if (waitBox && waitText) {
-        if (waitPhone) {
-          waitText.textContent = `📞 現場調度：${waitPhone}`;
-          waitBox.style.display = 'flex';
-        } else {
-          waitBox.style.display = 'none';
-        }
+      const waitPhoneInput = document.getElementById('mWaitPhoneInput');
+      if (waitPhoneInput && document.activeElement !== waitPhoneInput) {
+        waitPhoneInput.value = waitPhone;
       }
     }
 
@@ -428,19 +437,32 @@
       return localStorage.getItem('scale_wait_phone_' + pName) || '';
     }
 
-    function mobileSetWaitPhonePrompt() {
+    function onMobileWaitPhoneInput(val) {
       if (!activeProject) return;
-      const current = getProjectWaitPhone(activeProject);
-      const input = prompt(`請輸入【${activeProject}】等電話車數或調度備註：\n(例如: 2台等電話、全數等電話、正常出車，留空清除)`, current || "2台等電話");
-      if (input !== null) {
-        const clean = input.trim();
-        if (clean) {
-          localStorage.setItem('scale_wait_phone_' + activeProject, clean);
-        } else {
-          localStorage.removeItem('scale_wait_phone_' + activeProject);
-        }
-        updateDemandBanner();
+      const clean = (val || '').trim();
+      if (clean) {
+        localStorage.setItem('scale_wait_phone_' + activeProject, clean);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + activeProject);
       }
+    }
+
+    function applyMobileWaitPhoneTag(tag) {
+      if (!activeProject) return;
+      const input = document.getElementById('mWaitPhoneInput');
+      if (input) input.value = tag;
+      if (tag) {
+        localStorage.setItem('scale_wait_phone_' + activeProject, tag);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + activeProject);
+      }
+    }
+
+    function clearMobileWaitPhone() {
+      if (!activeProject) return;
+      const input = document.getElementById('mWaitPhoneInput');
+      if (input) input.value = '';
+      localStorage.removeItem('scale_wait_phone_' + activeProject);
     }
 
     // 輔助：更新同步狀態標籤
