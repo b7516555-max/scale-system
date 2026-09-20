@@ -67,9 +67,15 @@
     }
     const result = await res.json();
     const list = result.data || [];
-    // 清理時間格式，去除如 Sat Dec 30 1899 ... GMT+0800 (台北標準時間) 等試算表預設長字串
+    // 清理資料格式，轉型字串避免如數字 driver 或特殊物件導致 includes 崩潰
     return list.map(item => ({
       ...item,
+      customer: item.customer != null ? String(item.customer) : '',
+      project: item.project != null ? String(item.project) : '',
+      material: item.material != null ? String(item.material) : '',
+      driver: item.driver != null ? String(item.driver) : '-',
+      plate: item.plate != null ? String(item.plate) : '',
+      weight: Number(item.weight) || 0,
       exit_time: formatSimpleTime(item.exit_time)
     }));
   }

@@ -568,10 +568,11 @@
           calculate();
         };
 
-        let driverDisplay = item.driver || '-';
+        const driverStr = item.driver != null ? String(item.driver) : '-';
+        let driverDisplay = driverStr;
         let cargoTagHtml = '';
-        if (item.driver && (item.driver.includes("  ") || item.driver.includes("    "))) {
-          const parts = item.driver.split(/\s{2,}/);
+        if (driverStr && (driverStr.includes("  ") || driverStr.includes("    "))) {
+          const parts = driverStr.split(/\s{2,}/);
           driverDisplay = parts[0];
           const cargoPart = parts.slice(1).join(" ");
           cargoTagHtml = `<div style="margin-top: 3px;"><span style="display:inline-block; font-size:0.75rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; font-weight:600;">📦 ${cargoPart}</span></div>`;
