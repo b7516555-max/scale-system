@@ -237,10 +237,26 @@
       <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
     </div>
-    <div class="grid">
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
       <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
       <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
       <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
+      <div>
+        <label style="display:flex; justify-content:space-between;">
+          <span>預計需求量 (噸)</span>
+          <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
+        </label>
+        <input type="number" step="0.1" id="projectTarget" placeholder="例如: 150 (噸)" oninput="onTargetInput(this.value)">
+      </div>
+    </div>
+    <div id="projectDemandStatus" style="display:none; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-top:8px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span>🎯 目標需求：<b id="dispTargetTon" style="color:#2b6cb0;">0</b> 噸</span>
+        <span>🚚 已出貨：<b id="dispCurrentTon" style="color:#2d3748;">0</b> 噸</span>
+        <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.1rem; color:#c53030;">0</b> 噸</span>
+        <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#718096; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
+      </div>
+      <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="copyProjectShareLink()">📋 複製手機版連結傳給主任</button>
     </div>
   </div>
 
@@ -719,6 +735,87 @@
       }
     }
 
+    function getProjectTarget(pName) {
+      if (!pName) return 0;
+      const val = localStorage.getItem('scale_target_' + pName);
+      return val ? parseFloat(val) : 0;
+    }
+
+    function setProjectTarget(pName, val) {
+      if (!pName) return;
+      if (val && parseFloat(val) > 0) {
+        localStorage.setItem('scale_target_' + pName, parseFloat(val));
+      } else {
+        localStorage.removeItem('scale_target_' + pName);
+      }
+      updateDemandStatus();
+    }
+
+    function onTargetInput(val) {
+      if (!activeProject) return;
+      setProjectTarget(activeProject, val);
+    }
+
+    function setTargetPrompt() {
+      if (!activeProject) {
+        alert("請先選擇或輸入工程地點！");
+        return;
+      }
+      const current = getProjectTarget(activeProject);
+      const val = prompt(`請輸入【${activeProject}】預計需求總量 (噸)：`, current || "100");
+      if (val !== null) {
+        document.getElementById("projectTarget").value = val ? parseFloat(val) || "" : "";
+        setProjectTarget(activeProject, val);
+      }
+    }
+
+    function updateDemandStatus() {
+      const statusBox = document.getElementById("projectDemandStatus");
+      if (!activeProject) {
+        statusBox.style.display = "none";
+        return;
+      }
+
+      // 計算當前工地出貨累計
+      const siteRecords = currentRecords.filter(r => r.project === activeProject);
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      const targetTon = getProjectTarget(activeProject);
+      const targetInput = document.getElementById("projectTarget");
+      if (targetTon > 0) {
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = targetTon;
+        }
+        const remainingTon = Math.max(0, targetTon - currentTon);
+        
+        // 估計平均每車重量推算還需幾車
+        let avgPerTruck = siteRecords.length > 0 ? (currentTon / siteRecords.length) : 21.0;
+        if (avgPerTruck <= 0) avgPerTruck = 21.0;
+        const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+
+        document.getElementById("dispTargetTon").textContent = targetTon.toFixed(1);
+        document.getElementById("dispCurrentTon").textContent = currentTon.toFixed(2);
+        
+        const remEl = document.getElementById("dispRemainingTon");
+        if (remainingTon <= 0) {
+          remEl.textContent = "0.0 (已達標)";
+          remEl.style.color = "#38a169";
+          document.getElementById("dispRemainingTrucks").textContent = "🎉 出貨完畢";
+        } else {
+          remEl.textContent = remainingTon.toFixed(2);
+          remEl.style.color = "#c53030";
+          document.getElementById("dispRemainingTrucks").textContent = `約需再出 ${estTrucks} 車 (以每車約 ${avgPerTruck.toFixed(1)} 噸計)`;
+        }
+        statusBox.style.display = "flex";
+      } else {
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = "";
+        }
+        statusBox.style.display = "none";
+      }
+    }
+
     function switchProjectTab(pName) {
       activeProject = pName;
       if (knownProjects.has(pName)) {
@@ -727,6 +824,9 @@
         if (meta.customer) document.getElementById("customer").value = meta.customer;
         if (meta.material) document.getElementById("material").value = meta.material;
       }
+      const tVal = getProjectTarget(pName);
+      document.getElementById("projectTarget").value = tVal > 0 ? tVal : "";
+      updateDemandStatus();
       renderProjectTabs();
       renderTable();
     }
@@ -737,17 +837,26 @@
       const cleanName = newName.trim();
       const newCustomer = prompt("請輸入該案場的客戶名稱：", document.getElementById("customer").value || "高雄市政府") || "高雄市政府";
       const newMaterial = prompt("請輸入該案場的料別：", document.getElementById("material").value || "1/2密集配") || "1/2密集配";
+      const newTarget = prompt("請輸入該工程預計需求量 (噸，可留空稍後設定)：", "");
       
       knownProjects.set(cleanName, { customer: newCustomer.trim(), material: newMaterial.trim(), count: 0 });
+      if (newTarget && parseFloat(newTarget) > 0) {
+        setProjectTarget(cleanName, parseFloat(newTarget));
+      }
       switchProjectTab(cleanName);
     }
 
     function copyProjectShareLink() {
       if (activeProject === "全部地點") return;
       const baseUrl = window.location.href.split('?')[0].replace('index.html', 'view.html');
-      const shareUrl = `${baseUrl}?project=${encodeURIComponent(activeProject)}`;
+      let shareUrl = `${baseUrl}?project=${encodeURIComponent(activeProject)}`;
+      const targetTon = getProjectTarget(activeProject);
+      if (targetTon > 0) {
+        shareUrl += `&target=${targetTon}`;
+      }
       navigator.clipboard.writeText(shareUrl).then(() => {
-        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}\n\n傳給該工地主任，手機點開只會看到該工程車次！`);
+        const targetInfo = targetTon > 0 ? `\n(已包含需求量：${targetTon} 噸)` : '';
+        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}${targetInfo}\n\n傳給工地主任，手機點開即可直接看到已出數量與還要出多少！`);
       }).catch(() => {
         prompt("請複製此連結傳給該工地主任：", shareUrl);
       });
@@ -816,6 +925,7 @@
       document.getElementById("allTotalKg").textContent = runningTotal.toLocaleString();
       document.getElementById("allTotalTon").textContent = (runningTotal / 1000).toFixed(2);
       calculateSelected();
+      updateDemandStatus();
     }
 
     function calculateSelected() {

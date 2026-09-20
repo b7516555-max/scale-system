@@ -121,6 +121,86 @@
       gap: 3px;
     }
     .btn-refresh:active { background: #e2e8f0; }
+
+    /* 預計需求量與還要出多少 醒目進度看板 */
+    .demand-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ebf8ff 0%, #f0fff4 100%);
+      border: 1.5px solid #bee3f8;
+    }
+    .demand-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .demand-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #2c5282;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-set-target {
+      background: #ffffff;
+      border: 1px solid #cbd5e0;
+      color: #3182ce;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .demand-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 8px;
+    }
+    .demand-stat-card {
+      background: #ffffff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .demand-stat-label {
+      font-size: 0.72rem;
+      color: #718096;
+      margin-bottom: 2px;
+    }
+    .demand-stat-value {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #2d3748;
+    }
+    .demand-stat-value.highlight-remain {
+      font-size: 1.25rem;
+      color: #c53030;
+    }
+    .demand-stat-value.highlight-completed {
+      font-size: 1.2rem;
+      color: #2f855a;
+    }
+    .demand-trucks-hint {
+      font-size: 0.74rem;
+      color: #718096;
+      margin-top: 3px;
+    }
+    .demand-progress-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .demand-progress-fill {
+      height: 100%;
+      background: #3182ce;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
   </style>
   <script src="api-config.js"></script>
 </head>
@@ -143,6 +223,29 @@
     <div class="info-line">客戶：<b id="infoCustomer">-</b></div>
     <div class="info-line">工程：<b id="infoProject">-</b></div>
     <div class="info-line">料別：<b id="infoMaterial">-</b></div>
+
+    <!-- 預計需求量與還要出多少進度看板 -->
+    <div class="demand-banner" id="demandBanner">
+      <div class="demand-header">
+        <div class="demand-title">📊 <span>工程需求進度</span></div>
+        <button class="btn-set-target" onclick="mobileSetTargetPrompt()">✎ 設定目標噸數</button>
+      </div>
+      <div class="demand-stats-grid">
+        <div class="demand-stat-card">
+          <div class="demand-stat-label">預計需求總量</div>
+          <div class="demand-stat-value"><span id="mTargetTon">-</span> <small style="font-size:0.75rem; font-weight:normal; color:#718096;">噸</small></div>
+          <div class="demand-trucks-hint">已出：<span id="mDispatchedTon">0.00</span> 噸</div>
+        </div>
+        <div class="demand-stat-card" style="border-left: 3px solid #e53e3e;">
+          <div class="demand-stat-label">⏳ 還要出多少 (尚欠)</div>
+          <div class="demand-stat-value highlight-remain" id="mRemainingTon">-</div>
+          <div class="demand-trucks-hint" id="mEstTrucksHint">約需再出 - 車</div>
+        </div>
+      </div>
+      <div class="demand-progress-bar">
+        <div class="demand-progress-fill" id="mProgressFill" style="width: 0%;"></div>
+      </div>
+    </div>
   </div>
 
   <div class="tool-panel">
@@ -189,11 +292,93 @@
     const CACHE_KEY = 'scale_view_cache_data';
     const CACHE_TIME_KEY = 'scale_view_cache_time';
 
-    // 檢查 URL 參數是否指定了特定工程地點 (例如 ?project=苓雅區武慶三路)
+    // 檢查 URL 參數是否指定了特定工程地點 (例如 ?project=苓雅區武慶三路&target=150)
     const urlParams = new URLSearchParams(window.location.search);
     const paramProject = urlParams.get('project');
     if (paramProject) {
       activeProject = decodeURIComponent(paramProject.trim());
+    }
+    const paramTarget = urlParams.get('target');
+    if (paramTarget && activeProject) {
+      const parsedT = parseFloat(paramTarget);
+      if (parsedT > 0) {
+        localStorage.setItem('scale_target_' + activeProject, parsedT);
+      }
+    }
+
+    function getProjectTarget(pName) {
+      if (!pName) return 0;
+      const val = localStorage.getItem('scale_target_' + pName);
+      return val ? parseFloat(val) : 0;
+    }
+
+    function mobileSetTargetPrompt() {
+      if (!activeProject) return;
+      const current = getProjectTarget(activeProject);
+      const input = prompt(`請設定【${activeProject}】預計需求總量 (噸)：`, current || "100");
+      if (input !== null) {
+        const num = parseFloat(input);
+        if (num > 0) {
+          localStorage.setItem('scale_target_' + activeProject, num);
+        } else {
+          localStorage.removeItem('scale_target_' + activeProject);
+        }
+        updateDemandBanner();
+      }
+    }
+
+    function updateDemandBanner() {
+      const banner = document.getElementById('demandBanner');
+      if (!activeProject) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      const targetTon = getProjectTarget(activeProject);
+      const filtered = dispatches.filter(item => item.project === activeProject);
+      const dispatchedKg = filtered.reduce((acc, item) => acc + (Number(item.weight) || 0), 0);
+      const dispatchedTon = dispatchedKg / 1000;
+
+      document.getElementById('mDispatchedTon').textContent = dispatchedTon.toFixed(2);
+
+      if (targetTon > 0) {
+        banner.style.display = 'block';
+        document.getElementById('mTargetTon').textContent = targetTon.toFixed(1);
+        const remainingTon = Math.max(0, targetTon - dispatchedTon);
+        const remainEl = document.getElementById('mRemainingTon');
+        const trucksHintEl = document.getElementById('mEstTrucksHint');
+        const progressFillEl = document.getElementById('mProgressFill');
+
+        // 平均每車重量推估
+        let avgPerTruck = filtered.length > 0 ? (dispatchedTon / filtered.length) : 21.0;
+        if (avgPerTruck <= 0) avgPerTruck = 21.0;
+        const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+
+        const percent = Math.min(100, Math.round((dispatchedTon / targetTon) * 100));
+        progressFillEl.style.width = percent + '%';
+
+        if (remainingTon <= 0) {
+          remainEl.textContent = '0.00 (已達標)';
+          remainEl.className = 'demand-stat-value highlight-completed';
+          trucksHintEl.textContent = `🎉 已達標 (進度 ${percent}%)`;
+          progressFillEl.style.background = '#38a169';
+        } else {
+          remainEl.innerHTML = `<span style="font-size:1.4rem;">${remainingTon.toFixed(2)}</span> <small style="font-size:0.8rem; font-weight:normal; color:#718096;">噸</small>`;
+          remainEl.className = 'demand-stat-value highlight-remain';
+          trucksHintEl.textContent = `約需再出 ${estTrucks} 車 (每車約 ${avgPerTruck.toFixed(1)} 噸)`;
+          progressFillEl.style.background = '#3182ce';
+        }
+      } else {
+        // 未設定目標時，僅顯示簡易看板
+        document.getElementById('mTargetTon').textContent = '未設定';
+        const remainEl = document.getElementById('mRemainingTon');
+        remainEl.textContent = '請點右上設定';
+        remainEl.className = 'demand-stat-value';
+        remainEl.style.color = '#718096';
+        remainEl.style.fontSize = '0.95rem';
+        document.getElementById('mEstTrucksHint').textContent = '點選上方「✎ 設定目標噸數」';
+        document.getElementById('mProgressFill').style.width = '0%';
+      }
     }
 
     // 輔助：更新同步狀態標籤
@@ -417,6 +602,7 @@
       const totalTitle = activeProject ? `【${activeProject}】總發貨` : "工地總發貨";
       document.querySelector('.sticky-footer .footer-title').textContent = totalTitle;
       document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
+      updateDemandBanner();
       calculate();
     }
 
