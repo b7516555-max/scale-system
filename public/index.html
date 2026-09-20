@@ -40,6 +40,14 @@
     .server-setting-bar { background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
     .server-setting-bar input { width: 320px; padding: 6px 10px; font-size: 0.85rem; }
     .badge-cloud { background: #3182ce; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+    .quick-item-btn {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; background: #edf2f7; border: 1px solid #cbd5e0;
+      border-radius: 12px; font-size: 0.78rem; font-weight: 600; color: #2d3748;
+      cursor: pointer; transition: all 0.15s ease; user-select: none;
+    }
+    .quick-item-btn:hover { background: #e2e8f0; border-color: #a0aec0; }
+    .quick-item-btn:active { background: #cbd5e0; }
 
     /* 司機車牌管理彈窗樣式 */
     .modal-overlay {
@@ -257,6 +265,33 @@
       <div>
         <label>出場時間 (輸入數字如 1158)</label>
         <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
+      </div>
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label style="margin-bottom: 0;">隨車寄送／備註物品</label>
+          <select id="cargoQuickSelect" style="width: auto; padding: 2px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
+            <option value="">-- 常用物品下拉選單 --</option>
+            <option value="黏油1顆">🛢️ 黏油 1 顆</option>
+            <option value="黏油2顆">🛢️ 黏油 2 顆</option>
+            <option value="小便當1個">🍱 小便當 1 個</option>
+            <option value="小便當2個">🍱 小便當 2 個</option>
+            <option value="大便當1個">🍱 大便當 1 個</option>
+            <option value="大便當2個">🍱 大便當 2 個</option>
+            <option value="便當">🍱 便當</option>
+            <option value="物品">📦 物品</option>
+            <option value="清潔劑">🧴 清潔劑</option>
+            <option value="手套">🧤 手套</option>
+            <option value="工具">🔧 工具</option>
+          </select>
+        </div>
+        <input type="text" id="cargo_notes" placeholder="可直接手寫或點選上方/下方快選 (如: 黏油1顆)" autocomplete="off">
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('黏油1顆')">＋黏油1顆</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('小便當1個')">＋小便當1個</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('大便當1個')">＋大便當1個</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('物品')">＋物品</button>
+          <button type="button" class="quick-item-btn" style="color: #c53030;" onclick="clearCargoTags()">✕ 清除</button>
+        </div>
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center;">
@@ -570,6 +605,36 @@
       input.value = `${hh}:${mm}`;
     }
 
+    // 隨車物品下拉與標籤快選處理
+    function applyCargoSelect(val) {
+      if (!val) return;
+      const input = document.getElementById("cargo_notes");
+      const current = input.value.trim();
+      if (!current) {
+        input.value = val;
+      } else if (!current.includes(val)) {
+        input.value = current + '、' + val;
+      }
+      document.getElementById("cargoQuickSelect").value = "";
+      input.focus();
+    }
+
+    function addCargoTag(tag) {
+      const input = document.getElementById("cargo_notes");
+      const current = input.value.trim();
+      if (!current) {
+        input.value = tag;
+      } else if (!current.includes(tag)) {
+        input.value = current + '、' + tag;
+      }
+      input.focus();
+    }
+
+    function clearCargoTags() {
+      document.getElementById("cargo_notes").value = "";
+      document.getElementById("cargoQuickSelect").value = "";
+    }
+
     let currentRecords = [];
     let activeProject = "全部地點";
     let knownProjects = new Map(); // project -> { customer, material, count }
@@ -706,11 +771,20 @@
         if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
           tr.className = "editing-highlight";
         }
+        // 格式化司機與隨車物品顯示 (若有隨車物品則以明顯標籤徽章呈現)
+        let driverHtml = r.driver || '-';
+        if (r.driver && r.driver.includes("  ")) {
+          const parts = r.driver.split(/\s{2,}/);
+          const dName = parts[0];
+          const cargoPart = parts.slice(1).join(" ");
+          driverHtml = `<b>${dName}</b> <span style="display:inline-block; font-size:0.8rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; margin-left:4px; font-weight:600;">📦 ${cargoPart}</span>`;
+        }
+
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
           <td>${idx + 1}</td>
           <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
-          <td>${r.driver}</td>
+          <td>${driverHtml}</td>
           <td>${r.plate}</td>
           <td>${r.weight.toLocaleString()}</td>
           <td>${runningTotal.toLocaleString()}</td>
@@ -769,7 +843,18 @@
       document.getElementById("customer").value = record.customer || "";
       document.getElementById("project").value = record.project || "";
       document.getElementById("material").value = record.material || "";
-      document.getElementById("driver").value = record.driver || "";
+      
+      // 若原先紀錄的 driver 欄位中包含備註 (例如 "道友  黏油1顆,累計1顆" 或純司機名)
+      let dVal = record.driver || "";
+      let noteVal = "";
+      if (dVal.includes("  ")) {
+        const parts = dVal.split(/\s{2,}/);
+        dVal = parts[0].trim();
+        noteVal = parts.slice(1).join(" ").trim();
+      }
+      document.getElementById("driver").value = dVal;
+      document.getElementById("cargo_notes").value = noteVal;
+
       document.getElementById("plate").value = record.plate || "";
       document.getElementById("weight").value = record.weight || "";
       document.getElementById("exit_time").value = record.exit_time && record.exit_time !== '-' ? record.exit_time : "";
@@ -789,6 +874,8 @@
       editingDispatchId = null;
       document.getElementById("editDispatchId").value = "";
       document.getElementById("driver").value = "";
+      document.getElementById("cargo_notes").value = "";
+      document.getElementById("cargoQuickSelect").value = "";
       document.getElementById("plate").value = "";
       document.getElementById("weight").value = "";
       document.getElementById("exit_time").value = "";
@@ -808,12 +895,17 @@
         formattedTime = '0' + cleanTime.slice(0, 1) + ':' + cleanTime.slice(1, 3);
       }
 
+      const rawDriver = document.getElementById("driver").value.trim() || "-";
+      const cargoNotes = document.getElementById("cargo_notes").value.trim();
+      // 如果有填寫或選擇隨車寄送物品，自動格式化附加在司機姓名後方，如 "道友  黏油1顆"
+      const fullDriverField = cargoNotes ? `${rawDriver}  ${cargoNotes}` : rawDriver;
+
       const isEditing = Boolean(editingDispatchId);
       const payload = {
         customer: document.getElementById("customer").value.trim(),
         project: document.getElementById("project").value.trim(),
         material: document.getElementById("material").value.trim(),
-        driver: document.getElementById("driver").value.trim(),
+        driver: fullDriverField,
         plate: document.getElementById("plate").value.trim(),
         weight: parseInt(document.getElementById("weight").value, 10),
         exit_time: formattedTime || '-'
@@ -846,6 +938,8 @@
           // 新增車次流程
           await window.ScaleApi.postAction('addDispatch', payload);
           document.getElementById("driver").value = "";
+          document.getElementById("cargo_notes").value = "";
+          document.getElementById("cargoQuickSelect").value = "";
           document.getElementById("plate").value = "";
           document.getElementById("weight").value = "";
           document.getElementById("exit_time").value = "";
