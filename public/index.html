@@ -702,8 +702,9 @@
     function updateKnownProjects() {
       knownProjects.clear();
 
-      // 從已有歷史資料匯整出現過的所有個別工地地點
+      // 從已有歷史資料匯整出現過的所有個別工地地點（排除 __SET__ 設定記錄）
       currentRecords.forEach(r => {
+        if (r.plate === '__SET__') return; // 略過設定記錄
         const pName = r.project ? r.project.trim() : "";
         if (pName) {
           if (!knownProjects.has(pName)) {
@@ -712,6 +713,7 @@
           knownProjects.get(pName).count++;
         }
       });
+
 
       // 如果當前表單有設定工程，且尚未在清單中
       const formP = document.getElementById("project").value.trim();
@@ -776,15 +778,35 @@
       syncProjectSettingsToCloud(pName);
     }
 
-    // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets，讓手機端也能讀取
-    function syncProjectSettingsToCloud(pName) {
-      if (!pName || !window.ScaleApi || !window.ScaleApi.saveProjectSettings) return;
-      const target = getProjectTarget(pName);
-      const waitPhone = getProjectWaitPhone(pName);
-      window.ScaleApi.saveProjectSettings(pName, target, waitPhone).catch(err => {
-        console.warn('工程設定同步雲端失敗 (不影響本機操作):', err);
-      });
+    // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets 的特殊記錄，讓手機端也能讀取
+    // 不需要 GAS 後端新增 API，複用現有的 addDispatch / updateDispatch
+    async function syncProjectSettingsToCloud(pName) {
+      if (!pName || !window.ScaleApi) return;
+      const target = getProjectTarget(pName) || 0;
+      const waitPhone = getProjectWaitPhone(pName) || '';
+      const settingJson = JSON.stringify({ target, wait: waitPhone });
+      try {
+        // 找看看 currentRecords 裡有沒有此工地的 __SET__ 記錄
+        const existing = (currentRecords || []).find(r => r.plate === '__SET__' && r.customer === pName);
+        const payload = {
+          customer: pName, project: '__SETTINGS__',
+          material: settingJson, driver: '-',
+          plate: '__SET__', weight: 0, exit_time: '-'
+        };
+        if (existing) {
+          payload.id = existing.id;
+          await window.ScaleApi.postAction('updateDispatch', payload);
+        } else {
+          const res = await window.ScaleApi.postAction('addDispatch', payload);
+          if (res && res.success && res.data && currentRecords) {
+            currentRecords.push(res.data); // 加入本地，避免下次重複新增
+          }
+        }
+      } catch (err) {
+        console.warn('工程設定同步失敗 (不影響本機操作):', err);
+      }
     }
+
 
 
     function onTargetInput(val) {
@@ -995,10 +1017,23 @@
     async function loadRecords() {
       try {
         currentRecords = await window.ScaleApi.fetchDispatches();
+        // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage
+        currentRecords.filter(r => r.plate === '__SET__').forEach(r => {
+          try {
+            const cfg = JSON.parse(r.material || '{}');
+            const pName = r.customer;
+            if (pName) {
+              if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
+              if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+              else localStorage.removeItem('scale_wait_phone_' + pName);
+            }
+          } catch(e) {}
+        });
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
       } catch (err) {
         console.error('讀取失敗:', err);
         document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
@@ -1010,10 +1045,12 @@
       tbody.innerHTML = "";
       let runningTotal = 0;
 
-      // 依當前選中頁籤進行工程過濾
-      const displayRecords = activeProject === "全部地點" 
-        ? currentRecords 
-        : currentRecords.filter(r => r.project === activeProject);
+      // 依當前選中頁籤進行工程過濾，並排除 __SET__ 設定記錄
+      const displayRecords = (activeProject === "全部地點"
+        ? currentRecords
+        : currentRecords.filter(r => r.project === activeProject)
+      ).filter(r => r.plate !== '__SET__');
+
 
       displayRecords.forEach((r, idx) => {
         runningTotal += r.weight;
