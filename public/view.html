@@ -459,9 +459,27 @@
     async function fetchData(isManual = false) {
       updateSyncStatus('loading', isManual ? '正在更新...' : '同步最新資料...');
       try {
-        const freshData = await window.ScaleApi.fetchDispatches();
+        // 同時抓取出貨資料 & 工程設定（目標噸數、等電話車數）
+        const [freshData, projectSettings] = await Promise.all([
+          window.ScaleApi.fetchDispatches(),
+          window.ScaleApi.fetchProjectSettings ? window.ScaleApi.fetchProjectSettings() : Promise.resolve({})
+        ]);
         dispatches = freshData;
-        
+
+        // 將雲端工程設定寫入 localStorage，讓 getProjectTarget / getProjectWaitPhone 正確運作
+        if (projectSettings && typeof projectSettings === 'object') {
+          Object.entries(projectSettings).forEach(([pName, cfg]) => {
+            if (cfg.target > 0) {
+              localStorage.setItem('scale_target_' + pName, cfg.target);
+            }
+            if (cfg.waitPhone) {
+              localStorage.setItem('scale_wait_phone_' + pName, cfg.waitPhone);
+            } else {
+              localStorage.removeItem('scale_wait_phone_' + pName);
+            }
+          });
+        }
+
         // 存入本地快取
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify(freshData));
@@ -476,7 +494,6 @@
         updateSyncStatus('done', `已更新 (${getShortTime()})`);
       } catch (err) {
         console.error('資料載入錯誤:', err);
-        // 如果有舊快取資料，告知使用快取；若完全沒資料則顯示錯誤
         if (dispatches.length > 0) {
           updateSyncStatus('error', '網路異常 (使用快取)');
         } else {
@@ -490,6 +507,7 @@
         }
       }
     }
+
 
     // 手動刷新按鈕
     function refreshData() {

@@ -773,7 +773,19 @@
         localStorage.removeItem('scale_target_' + pName);
       }
       updateDemandStatus();
+      syncProjectSettingsToCloud(pName);
     }
+
+    // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets，讓手機端也能讀取
+    function syncProjectSettingsToCloud(pName) {
+      if (!pName || !window.ScaleApi || !window.ScaleApi.saveProjectSettings) return;
+      const target = getProjectTarget(pName);
+      const waitPhone = getProjectWaitPhone(pName);
+      window.ScaleApi.saveProjectSettings(pName, target, waitPhone).catch(err => {
+        console.warn('工程設定同步雲端失敗 (不影響本機操作):', err);
+      });
+    }
+
 
     function onTargetInput(val) {
       if (!activeProject) return;
@@ -828,7 +840,9 @@
         localStorage.removeItem('scale_wait_phone_' + pName);
       }
       updateDemandStatus();
+      syncProjectSettingsToCloud(pName);
     }
+
 
     function onWaitPhoneInput(val) {
       if (!activeProject) return;

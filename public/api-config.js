@@ -126,12 +126,36 @@
     return result;
   }
 
+  // 讀取所有工程設定 (手機端呼叫，讀取 Google Sheets 中的目標噸數與等電話車數)
+  async function fetchProjectSettings() {
+    const baseUrl = getApiBaseUrl();
+    if (!baseUrl) return {};
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const requestUrl = baseUrl + separator + 'action=getProjectSettings&_t=' + Date.now();
+    try {
+      const res = await fetch(requestUrl, { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' });
+      if (!res.ok) return {};
+      const result = await res.json();
+      return result.data || {};
+    } catch (e) {
+      console.warn('fetchProjectSettings 失敗:', e);
+      return {};
+    }
+  }
+
+  // 儲存工程設定 (電腦端呼叫，將目標噸數與等電話車數寫入 Google Sheets)
+  async function saveProjectSettings(project, target, waitPhone) {
+    return postAction('setProjectSettings', { project, target: Number(target) || 0, waitPhone: waitPhone || '' });
+  }
+
   window.ScaleApi = {
     getBaseUrl: getApiBaseUrl,
     setBaseUrl: setApiBaseUrl,
     getAdminKey: getAdminKey,
     setAdminKey: setAdminKey,
     fetchDispatches: fetchDispatches,
-    postAction: postAction
+    postAction: postAction,
+    fetchProjectSettings: fetchProjectSettings,
+    saveProjectSettings: saveProjectSettings
   };
 })();
