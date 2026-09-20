@@ -619,6 +619,70 @@
         container.appendChild(card);
       });
 
+      // 尾台摘要卡：在最後一台車之後顯示本工地調度摘要
+      if (activeProject && filtered.length > 0) {
+        const targetTon = getProjectTarget(activeProject);
+        const dispatchedKg = filtered.reduce((acc, it) => acc + (Number(it.weight) || 0), 0);
+        const dispatchedTon = dispatchedKg / 1000;
+        const waitPhone = getProjectWaitPhone(activeProject);
+
+        let targetRow = '';
+        let remainRow = '';
+        if (targetTon > 0) {
+          const remainingTon = Math.max(0, targetTon - dispatchedTon);
+          const pct = Math.min(100, Math.round((dispatchedTon / targetTon) * 100));
+          let avgPerTruck = filtered.length > 0 ? (dispatchedTon / filtered.length) : 21.0;
+          if (avgPerTruck <= 0) avgPerTruck = 21.0;
+          const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+          const remainLabel = remainingTon <= 0
+            ? `<span style="color:#2f855a;font-weight:800;">✅ 已達標</span>`
+            : `<span style="color:#c53030;font-weight:800;">${remainingTon.toFixed(2)} 噸</span><span style="font-size:0.78rem;color:#718096;"> (約需再出 ${estTrucks} 車)</span>`;
+          targetRow = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🎯 預計總量</span>
+              <span style="font-weight:700;color:#2b6cb0;">${targetTon.toFixed(1)} 噸</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🚚 已出累計</span>
+              <span style="font-weight:700;color:#2d3748;">${dispatchedTon.toFixed(2)} 噸 (${pct}%)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;${waitPhone ? 'border-bottom:1px solid #e2e8f0;' : ''}">
+              <span style="font-size:0.8rem;color:#718096;">⏳ 還要出</span>
+              <span>${remainLabel}</span>
+            </div>`;
+        } else {
+          targetRow = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🚚 已出累計</span>
+              <span style="font-weight:700;color:#2d3748;">${dispatchedTon.toFixed(2)} 噸</span>
+            </div>`;
+        }
+
+        let waitRow = '';
+        if (waitPhone) {
+          waitRow = `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+              <span style="font-size:1rem;">📞</span>
+              <div>
+                <div style="font-size:0.72rem;color:#744210;font-weight:600;">現場調度指示</div>
+                <div style="font-size:0.95rem;font-weight:800;color:#b7791f;">${waitPhone}</div>
+              </div>
+            </div>`;
+        }
+
+        const tailCard = document.createElement('div');
+        tailCard.style.cssText = 'margin:10px 12px 6px;padding:10px 14px;background:linear-gradient(135deg,#ebf8ff 0%,#f0fff4 100%);border:1.5px solid #bee3f8;border-radius:12px;font-size:0.88rem;';
+        tailCard.innerHTML = `
+          <div style="font-size:0.78rem;font-weight:700;color:#2c5282;margin-bottom:6px;display:flex;align-items:center;gap:4px;">
+            📊 第 ${filtered.length} 車（尾台）出貨摘要
+            <span style="margin-left:auto;font-size:0.7rem;background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8;padding:1px 6px;border-radius:8px;">👁️ 僅供查閱</span>
+          </div>
+          ${targetRow}
+          ${waitRow}
+        `;
+        container.appendChild(tailCard);
+      }
+
       const totalTitle = activeProject ? `【${activeProject}】總發貨` : "工地總發貨";
       document.querySelector('.sticky-footer .footer-title').textContent = totalTitle;
       document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
