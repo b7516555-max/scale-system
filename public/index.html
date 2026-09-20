@@ -323,6 +323,7 @@
             <th>客戶 / 工程 / 料別</th>
             <th>司機</th>
             <th>車牌</th>
+            <th>隨車寄送 / 備註</th>
             <th>實重 (KG)</th>
             <th>累計重量 (KG)</th>
             <th>出場時間</th>
@@ -771,21 +772,23 @@
         if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
           tr.className = "editing-highlight";
         }
-        // 格式化司機與隨車物品顯示 (若有隨車物品則以明顯標籤徽章呈現)
-        let driverHtml = r.driver || '-';
+        // 分離司機名稱與隨車物品獨立欄位呈現
+        let driverName = r.driver || '-';
+        let cargoHtml = '<span style="color:#a0aec0;">-</span>';
         if (r.driver && r.driver.includes("  ")) {
           const parts = r.driver.split(/\s{2,}/);
-          const dName = parts[0];
+          driverName = parts[0];
           const cargoPart = parts.slice(1).join(" ");
-          driverHtml = `<b>${dName}</b> <span style="display:inline-block; font-size:0.8rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; margin-left:4px; font-weight:600;">📦 ${cargoPart}</span>`;
+          cargoHtml = `<span style="display:inline-block; font-size:0.82rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:2px 8px; border-radius:12px; font-weight:700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${cargoPart}</span>`;
         }
 
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
           <td>${idx + 1}</td>
           <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
-          <td>${driverHtml}</td>
+          <td><b>${driverName}</b></td>
           <td>${r.plate}</td>
+          <td>${cargoHtml}</td>
           <td>${r.weight.toLocaleString()}</td>
           <td>${runningTotal.toLocaleString()}</td>
           <td>${r.exit_time}</td>
