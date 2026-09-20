@@ -245,6 +245,10 @@
       <div class="demand-progress-bar">
         <div class="demand-progress-fill" id="mProgressFill" style="width: 0%;"></div>
       </div>
+      <div id="mWaitPhoneAlert" style="display:none; margin-top:8px; padding:6px 10px; background:#fefcbf; border:1px solid #f6e05e; border-radius:6px; font-size:0.85rem; color:#744210; font-weight:700; align-items:center; justify-content:space-between;">
+        <span id="mWaitPhoneText">📞 等電話車數：-</span>
+        <button type="button" style="background:#fff; border:1px solid #ecc94b; color:#975a16; font-size:0.75rem; padding:2px 8px; border-radius:10px; cursor:pointer;" onclick="mobileSetWaitPhonePrompt()">修改</button>
+      </div>
     </div>
   </div>
 
@@ -304,6 +308,10 @@
       if (parsedT > 0) {
         localStorage.setItem('scale_target_' + activeProject, parsedT);
       }
+    }
+    const paramWait = urlParams.get('wait');
+    if (paramWait && activeProject) {
+      localStorage.setItem('scale_wait_phone_' + activeProject, decodeURIComponent(paramWait.trim()));
     }
 
     function getProjectTarget(pName) {
@@ -399,6 +407,39 @@
         remainEl.style.fontSize = '0.95rem';
         document.getElementById('mEstTrucksHint').textContent = '點選上方「✎ 設定目標噸數」';
         document.getElementById('mProgressFill').style.width = '0%';
+      }
+
+      // 呈現等電話狀態列
+      const waitPhone = getProjectWaitPhone(activeProject);
+      const waitBox = document.getElementById('mWaitPhoneAlert');
+      const waitText = document.getElementById('mWaitPhoneText');
+      if (waitBox && waitText) {
+        if (waitPhone) {
+          waitText.textContent = `📞 現場調度：${waitPhone}`;
+          waitBox.style.display = 'flex';
+        } else {
+          waitBox.style.display = 'none';
+        }
+      }
+    }
+
+    function getProjectWaitPhone(pName) {
+      if (!pName) return '';
+      return localStorage.getItem('scale_wait_phone_' + pName) || '';
+    }
+
+    function mobileSetWaitPhonePrompt() {
+      if (!activeProject) return;
+      const current = getProjectWaitPhone(activeProject);
+      const input = prompt(`請輸入【${activeProject}】等電話車數或調度備註：\n(例如: 2台等電話、全數等電話、正常出車，留空清除)`, current || "2台等電話");
+      if (input !== null) {
+        const clean = input.trim();
+        if (clean) {
+          localStorage.setItem('scale_wait_phone_' + activeProject, clean);
+        } else {
+          localStorage.removeItem('scale_wait_phone_' + activeProject);
+        }
+        updateDemandBanner();
       }
     }
 

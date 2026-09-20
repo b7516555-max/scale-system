@@ -237,31 +237,48 @@
       <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
     </div>
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));">
       <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
       <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
       <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
       <div>
         <label style="display:flex; justify-content:space-between;">
-          <span>預計需求總量 (噸)</span>
+          <span>預計總量 (噸)</span>
           <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
         </label>
         <input type="number" step="0.1" id="projectTarget" placeholder="例如: 150" oninput="onTargetInput(this.value)">
       </div>
       <div>
         <label style="display:flex; justify-content:space-between;">
-          <span style="color:#c53030; font-weight:700;">⏳ 還要出多少 (噸)</span>
-          <span style="font-size:0.75rem; color:#718096;">可直接手key</span>
+          <span style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</span>
+          <span style="font-size:0.75rem; color:#718096;">可手key</span>
         </label>
-        <input type="number" step="0.1" id="projectRemainingInput" placeholder="例如: 40 (或等車)" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
+        <input type="number" step="0.1" id="projectRemainingInput" placeholder="例如: 40" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
+      </div>
+      <div>
+        <label style="display:flex; justify-content:space-between;">
+          <span style="color:#d69e2e; font-weight:700;">📞 等電話／車數</span>
+          <span style="font-size:0.75rem; color:#718096;">現場調度</span>
+        </label>
+        <input type="text" id="projectWaitPhoneInput" placeholder="例如: 2台等電話" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
       </div>
     </div>
-    <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; margin-top:8px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; gap:6px; margin-top:2px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+      <span style="font-size:0.78rem; color:#718096;">快選等電話：</span>
+      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('1台等電話')">📞 1台等電話</button>
+      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('2台等電話')">📞 2台等電話</button>
+      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('3台等電話')">📞 3台等電話</button>
+      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('全數等電話通知')">⚠️ 全數等電話通知</button>
+      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('正常出車')">✅ 正常出車</button>
+      <button type="button" class="quick-item-btn" style="color:#e53e3e;" onclick="applyWaitPhoneTag('')">✕ 清除</button>
+    </div>
+    <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <span>🎯 目標總量：<b id="dispTargetTon" style="color:#2b6cb0;">0.0</b> 噸</span>
         <span>🚚 已出累計：<b id="dispCurrentTon" style="color:#2d3748;">0.00</b> 噸</span>
         <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.15rem; color:#c53030;">0.00</b> 噸</span>
         <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#4a5568; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
+        <span id="dispWaitPhoneBadge" style="display:none; font-size:0.85rem; color:#b7791f; background:#fefcbf; border:1px solid #f6e05e; padding:3px 10px; border-radius:12px; font-weight:700;"></span>
       </div>
       <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="copyProjectShareLink()">📋 複製手機版連結傳給主任</button>
     </div>
@@ -797,6 +814,34 @@
       }
     }
 
+    function getProjectWaitPhone(pName) {
+      if (!pName) return "";
+      return localStorage.getItem('scale_wait_phone_' + pName) || "";
+    }
+
+    function setProjectWaitPhone(pName, val) {
+      if (!pName) return;
+      const clean = (val || "").trim();
+      if (clean) {
+        localStorage.setItem('scale_wait_phone_' + pName, clean);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + pName);
+      }
+      updateDemandStatus();
+    }
+
+    function onWaitPhoneInput(val) {
+      if (!activeProject) return;
+      setProjectWaitPhone(activeProject, val);
+    }
+
+    function applyWaitPhoneTag(tag) {
+      if (!activeProject) return;
+      const input = document.getElementById("projectWaitPhoneInput");
+      if (input) input.value = tag;
+      setProjectWaitPhone(activeProject, tag);
+    }
+
     function updateDemandStatus() {
       const statusBox = document.getElementById("projectDemandStatus");
       if (!activeProject) {
@@ -810,8 +855,24 @@
       const currentTon = totalKg / 1000;
 
       const targetTon = getProjectTarget(activeProject);
+      const waitPhone = getProjectWaitPhone(activeProject);
       const targetInput = document.getElementById("projectTarget");
       const remainingInput = document.getElementById("projectRemainingInput");
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      const waitPhoneBadge = document.getElementById("dispWaitPhoneBadge");
+
+      if (waitPhoneInput && document.activeElement !== waitPhoneInput) {
+        waitPhoneInput.value = waitPhone;
+      }
+
+      if (waitPhoneBadge) {
+        if (waitPhone) {
+          waitPhoneBadge.textContent = `📞 ${waitPhone}`;
+          waitPhoneBadge.style.display = "inline-block";
+        } else {
+          waitPhoneBadge.style.display = "none";
+        }
+      }
 
       document.getElementById("dispCurrentTon").textContent = currentTon.toFixed(2);
 
@@ -867,6 +928,9 @@
       const tVal = getProjectTarget(pName);
       const targetInput = document.getElementById("projectTarget");
       if (targetInput) targetInput.value = tVal > 0 ? tVal : "";
+      const wVal = getProjectWaitPhone(pName);
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      if (waitPhoneInput) waitPhoneInput.value = wVal;
       updateDemandStatus();
       renderProjectTabs();
       renderTable();
@@ -879,10 +943,14 @@
       const newCustomer = prompt("請輸入該案場的客戶名稱：", document.getElementById("customer").value || "高雄市政府") || "高雄市政府";
       const newMaterial = prompt("請輸入該案場的料別：", document.getElementById("material").value || "1/2密集配") || "1/2密集配";
       const newTarget = prompt("請輸入該工程預計需求量 (噸，可留空稍後設定)：", "");
+      const newWait = prompt("是否有等電話車數？(如: 2台等電話，可留空)：", "");
       
       knownProjects.set(cleanName, { customer: newCustomer.trim(), material: newMaterial.trim(), count: 0 });
       if (newTarget && parseFloat(newTarget) > 0) {
         setProjectTarget(cleanName, parseFloat(newTarget));
+      }
+      if (newWait && newWait.trim()) {
+        setProjectWaitPhone(cleanName, newWait.trim());
       }
       switchProjectTab(cleanName);
     }
@@ -895,9 +963,16 @@
       if (targetTon > 0) {
         shareUrl += `&target=${targetTon}`;
       }
+      const waitPhone = getProjectWaitPhone(activeProject);
+      if (waitPhone) {
+        shareUrl += `&wait=${encodeURIComponent(waitPhone)}`;
+      }
       navigator.clipboard.writeText(shareUrl).then(() => {
-        const targetInfo = targetTon > 0 ? `\n(已包含需求量：${targetTon} 噸)` : '';
-        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}${targetInfo}\n\n傳給工地主任，手機點開即可直接看到已出數量與還要出多少！`);
+        const details = [];
+        if (targetTon > 0) details.push(`預計需求：${targetTon} 噸`);
+        if (waitPhone) details.push(`調度狀態：${waitPhone}`);
+        const extra = details.length > 0 ? `\n(${details.join('，')})` : '';
+        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}${extra}\n\n傳給工地主任，手機點開即可直接看到已出數量、還要出多少與等電話通知！`);
       }).catch(() => {
         prompt("請複製此連結傳給該工地主任：", shareUrl);
       });
