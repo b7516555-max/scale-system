@@ -181,7 +181,7 @@
 
   <script>
     let dispatches = [];
-    let activeProject = "全部地點";
+    let activeProject = "";
     let projectCounts = new Map();
 
     const CACHE_KEY = 'scale_view_cache_data';
@@ -295,34 +295,35 @@
     function updateProjectCounts() {
       projectCounts.clear();
       dispatches.forEach(item => {
-        const p = item.project || '未指定地點';
-        projectCounts.set(p, (projectCounts.get(p) || 0) + 1);
+        const p = item.project ? item.project.trim() : '';
+        if (p) {
+          projectCounts.set(p, (projectCounts.get(p) || 0) + 1);
+        }
       });
+
+      // 若未指定或不存在，自動預設為第一個個別工地
+      if (!activeProject || !projectCounts.has(activeProject)) {
+        const firstP = projectCounts.keys().next().value;
+        if (firstP) activeProject = firstP;
+      }
     }
 
     function renderProjectTabs() {
       const container = document.getElementById('mobileTabsContainer');
       container.innerHTML = '';
 
-      // 若只有 1 個工程或沒有資料，隱藏頁籤
-      if (projectCounts.size <= 1 && activeProject === "全部地點") {
+      // 若沒有工地資料，隱藏頁籤
+      if (projectCounts.size === 0) {
         container.style.display = 'none';
         return;
       }
       container.style.display = 'flex';
 
-      // 1.「全部地點」頁籤
-      const allBtn = document.createElement('button');
-      allBtn.className = 'm-tab-btn' + (activeProject === '全部地點' ? ' active' : '');
-      allBtn.innerHTML = `<span>🌐 全部</span><span class="m-tab-count">${dispatches.length}</span>`;
-      allBtn.onclick = () => switchMobileTab('全部地點');
-      container.appendChild(allBtn);
-
-      // 2. 各個工程地點頁籤
+      // 依需求：不再顯示「全部」，只顯示個別工地分頁
       projectCounts.forEach((cnt, pName) => {
         const btn = document.createElement('button');
         btn.className = 'm-tab-btn' + (activeProject === pName ? ' active' : '');
-        btn.innerHTML = `<span>📍 ${pName}</span><span class="m-tab-count">${cnt}</span>`;
+        btn.innerHTML = `<span>📍 ${pName}</span><span class="m-tab-count">${cnt} 車</span>`;
         btn.onclick = () => switchMobileTab(pName);
         container.appendChild(btn);
       });
@@ -339,18 +340,19 @@
       container.innerHTML = '';
       let totalAllKg = 0;
 
-      // 依當前頁籤過濾車次清單
-      const filtered = activeProject === "全部地點" 
-        ? dispatches 
-        : dispatches.filter(item => item.project === activeProject);
+      // 依選中的個別工地過濾車次清單
+      const filtered = activeProject
+        ? dispatches.filter(item => item.project === activeProject)
+        : dispatches;
 
       if (filtered.length > 0) {
         document.getElementById('infoCustomer').textContent = filtered[0].customer || '-';
-        document.getElementById('infoProject').textContent = activeProject === "全部地點" ? "全部工程彙整" : activeProject;
+        document.getElementById('infoProject').textContent = activeProject || '-';
         document.getElementById('infoMaterial').textContent = filtered[0].material || '-';
-        document.getElementById('pageHeadingTitle').textContent = activeProject === "全部地點" ? "現場出貨過磅" : activeProject;
+        document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
       } else {
-        document.getElementById('infoProject').textContent = activeProject;
+        document.getElementById('infoProject').textContent = activeProject || '-';
+        document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
       }
 
       filtered.forEach((item, index) => {
@@ -397,7 +399,7 @@
         container.appendChild(card);
       });
 
-      const totalTitle = activeProject === "全部地點" ? "全日總發貨" : `【${activeProject}】總發貨`;
+      const totalTitle = activeProject ? `【${activeProject}】總發貨` : "工地總發貨";
       document.querySelector('.sticky-footer .footer-title').textContent = totalTitle;
       document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
       calculate();

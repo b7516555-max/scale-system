@@ -335,7 +335,7 @@
     </div>
 
     <div class="summary-bar">
-      <div>全部總重：<span id="allTotalKg" style="font-weight: bold;">0</span> KG (<span id="allTotalTon" style="font-weight: bold;">0.00</span> 噸)</div>
+      <div><span id="projectTotalLabel">工地總重：</span><span id="allTotalKg" style="font-weight: bold;">0</span> KG (<span id="allTotalTon" style="font-weight: bold;">0.00</span> 噸)</div>
       <div>勾選加總：<span id="selectedKg" class="highlight">0</span> KG (<span id="selectedTon" class="highlight">0.00</span> 噸)</div>
     </div>
   </div>
@@ -637,7 +637,7 @@
     }
 
     let currentRecords = [];
-    let activeProject = "全部地點";
+    let activeProject = "";
     let knownProjects = new Map(); // project -> { customer, material, count }
     let editingDispatchId = null; // 當前正在編輯的車次 ID
 
@@ -661,34 +661,44 @@
 
     function updateKnownProjects() {
       knownProjects.clear();
-      // 預設第一個工程地點
-      const defaultP = document.getElementById("project").value.trim() || "苓雅區武慶三路";
-      const defaultC = document.getElementById("customer").value.trim() || "高雄市政府";
-      const defaultM = document.getElementById("material").value.trim() || "1/2密集配";
-      knownProjects.set(defaultP, { customer: defaultC, material: defaultM, count: 0 });
 
-      // 從已有歷史資料匯整出現過的所有地點
+      // 從已有歷史資料匯整出現過的所有個別工地地點
       currentRecords.forEach(r => {
-        const pName = r.project || "未指定地點";
-        if (!knownProjects.has(pName)) {
-          knownProjects.set(pName, { customer: r.customer || "", material: r.material || "", count: 0 });
+        const pName = r.project ? r.project.trim() : "";
+        if (pName) {
+          if (!knownProjects.has(pName)) {
+            knownProjects.set(pName, { customer: r.customer || "", material: r.material || "", count: 0 });
+          }
+          knownProjects.get(pName).count++;
         }
-        knownProjects.get(pName).count++;
       });
+
+      // 如果當前表單有設定工程，且尚未在清單中
+      const formP = document.getElementById("project").value.trim();
+      const formC = document.getElementById("customer").value.trim();
+      const formM = document.getElementById("material").value.trim();
+      if (formP && !knownProjects.has(formP)) {
+        knownProjects.set(formP, { customer: formC, material: formM, count: 0 });
+      }
+
+      // 如果尚未選定 activeProject 或當前 activeProject 不存在於個別工地清單中，自動選取第一個個別工地
+      if (!activeProject || !knownProjects.has(activeProject)) {
+        const firstKey = knownProjects.keys().next().value;
+        if (firstKey) {
+          activeProject = firstKey;
+          const meta = knownProjects.get(firstKey);
+          document.getElementById("project").value = firstKey;
+          if (meta.customer) document.getElementById("customer").value = meta.customer;
+          if (meta.material) document.getElementById("material").value = meta.material;
+        }
+      }
     }
 
     function renderProjectTabs() {
       const container = document.getElementById("projectTabsContainer");
       container.innerHTML = "";
 
-      // 1.「全部地點」頁籤
-      const allBtn = document.createElement("button");
-      allBtn.className = "project-tab-btn" + (activeProject === "全部地點" ? " active" : "");
-      allBtn.innerHTML = `<span>🌐 全部地點</span><span class="project-tab-count">${currentRecords.length} 車</span>`;
-      allBtn.onclick = () => switchProjectTab("全部地點");
-      container.appendChild(allBtn);
-
-      // 2. 各個工程地點頁籤
+      // 依使用者需求：不再顯示「全部地點/全部車次」，僅呈現各個個別工地分頁
       knownProjects.forEach((meta, pName) => {
         const btn = document.createElement("button");
         btn.className = "project-tab-btn" + (activeProject === pName ? " active" : "");
@@ -697,8 +707,8 @@
         container.appendChild(btn);
       });
 
-      // 3. 快速分享當前案場連結按鈕
-      if (activeProject !== "全部地點") {
+      // 快速分享當前案場連結按鈕
+      if (activeProject && knownProjects.has(activeProject)) {
         const shareBtn = document.createElement("button");
         shareBtn.className = "project-tab-btn";
         shareBtn.style.borderColor = "#38a169";
@@ -711,7 +721,7 @@
 
     function switchProjectTab(pName) {
       activeProject = pName;
-      if (pName !== "全部地點" && knownProjects.has(pName)) {
+      if (knownProjects.has(pName)) {
         const meta = knownProjects.get(pName);
         document.getElementById("project").value = pName;
         if (meta.customer) document.getElementById("customer").value = meta.customer;
@@ -800,7 +810,9 @@
         tbody.appendChild(tr);
       });
 
-      const titlePrefix = activeProject === "全部地點" ? "全部總重" : `【${activeProject}】總重`;
+      const titlePrefix = activeProject ? `【${activeProject}】總重` : "工地總重";
+      const totalLabelEl = document.getElementById("projectTotalLabel");
+      if (totalLabelEl) totalLabelEl.textContent = titlePrefix + "：";
       document.getElementById("allTotalKg").textContent = runningTotal.toLocaleString();
       document.getElementById("allTotalTon").textContent = (runningTotal / 1000).toFixed(2);
       calculateSelected();
