@@ -246,14 +246,14 @@
           <span>預計總量 (噸)</span>
           <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
         </label>
-        <input type="number" step="0.1" id="projectTarget" placeholder="例如: 150" oninput="onTargetInput(this.value)">
+        <input type="text" inputmode="decimal" id="projectTarget" placeholder="例如: 600" oninput="onTargetInput(this.value)">
       </div>
       <div>
         <label style="display:flex; justify-content:space-between;">
           <span style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</span>
           <span style="font-size:0.75rem; color:#718096;">可手key</span>
         </label>
-        <input type="number" step="0.1" id="projectRemainingInput" placeholder="例如: 40" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
+        <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
       </div>
       <div>
         <label style="display:flex; justify-content:space-between;">
@@ -279,6 +279,7 @@
         <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.15rem; color:#c53030;">0.00</b> 噸</span>
         <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#4a5568; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
         <span id="dispWaitPhoneBadge" style="display:none; font-size:0.85rem; color:#b7791f; background:#fefcbf; border:1px solid #f6e05e; padding:3px 10px; border-radius:12px; font-weight:700;"></span>
+        <span id="projectSyncBadge" style="display:none; font-size:0.75rem; padding:2px 8px; border-radius:10px;"></span>
       </div>
       <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="copyProjectShareLink()">📋 複製手機版連結傳給主任</button>
     </div>
@@ -769,6 +770,25 @@
 
     let syncSettingsTimer = null;
 
+    function setSyncStatusBadge(status, text) {
+      const badge = document.getElementById("projectSyncBadge");
+      if (!badge) return;
+      badge.style.display = "inline-block";
+      if (status === 'syncing') {
+        badge.style.background = "#feebc8";
+        badge.style.color = "#c05621";
+        badge.innerHTML = `⏳ ${text || '雲端同步中...'}`;
+      } else if (status === 'synced') {
+        badge.style.background = "#c6f6d5";
+        badge.style.color = "#22543d";
+        badge.innerHTML = `☁️ ${text || '雲端已同步'}`;
+      } else if (status === 'error') {
+        badge.style.background = "#fed7d7";
+        badge.style.color = "#9b2c2c";
+        badge.innerHTML = `⚠️ ${text || '同步失敗'}`;
+      }
+    }
+
     function setProjectTarget(pName, val) {
       if (!pName) return;
       const num = parseFloat(val);
@@ -782,6 +802,7 @@
     }
 
     function debouncedSyncProjectSettings(pName) {
+      setSyncStatusBadge('syncing', '正在儲存...');
       if (syncSettingsTimer) clearTimeout(syncSettingsTimer);
       syncSettingsTimer = setTimeout(() => {
         syncProjectSettingsToCloud(pName);
@@ -789,7 +810,6 @@
     }
 
     // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets 的特殊記錄，讓手機端也能讀取
-    // 不需要 GAS 後端新增 API，複用現有的 addDispatch / updateDispatch
     async function syncProjectSettingsToCloud(pName) {
       if (!pName || !window.ScaleApi) return;
       const target = getProjectTarget(pName) || 0;
@@ -811,42 +831,69 @@
             currentRecords.push(res.data);
           }
         }
+        setSyncStatusBadge('synced', '已同步至雲端');
       } catch (err) {
         console.warn('工程設定同步失敗 (不影響本機操作):', err);
+        setSyncStatusBadge('error', '雲端同步異常');
       }
     }
 
+    // 當使用者在「預計總量 (噸)」輸入時：即時聯動推算「還要出 (噸)」
     function onTargetInput(val) {
       if (!activeProject) return;
-      setProjectTarget(activeProject, val);
+      const cleanVal = (val || "").trim();
+      const num = parseFloat(cleanVal);
+      if (!isNaN(num) && num > 0) {
+        localStorage.setItem('scale_target_' + activeProject, num);
+      } else {
+        localStorage.removeItem('scale_target_' + activeProject);
+      }
+
+      // 同步更新「還要出」欄位（若使用者當前未在還要出欄位打字）
+      const remainingInput = document.getElementById("projectRemainingInput");
+      if (remainingInput && document.activeElement !== remainingInput) {
+        const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
+        const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+        const currentTon = totalKg / 1000;
+        if (!isNaN(num) && num > 0) {
+          const rem = Math.round((num - currentTon) * 100) / 100;
+          remainingInput.value = rem > 0 ? rem : "0";
+        } else {
+          remainingInput.value = "";
+        }
+      }
+
+      updateDemandStatus();
+      debouncedSyncProjectSettings(activeProject);
     }
 
-    // 當使用者直接在「還要出多少 (噸)」手 key 時，自動反推預計需求總量 = 當前已出噸數 + 還要出的噸數
+    // 當使用者直接在「還要出多少 (噸)」手 key 時：自動聯動反推「預計需求總量」= 當前已出噸數 + 還要出的噸數
     function onRemainingInput(val) {
       if (!activeProject) return;
       const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
       const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
       const currentTon = totalKg / 1000;
 
-      const remNum = parseFloat(val);
+      const cleanVal = (val || "").trim();
+      const remNum = parseFloat(cleanVal);
+      const targetInput = document.getElementById("projectTarget");
+
       if (!isNaN(remNum) && remNum >= 0) {
         const calculatedTarget = Math.round((currentTon + remNum) * 100) / 100;
         localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
-        const targetInput = document.getElementById("projectTarget");
         if (targetInput && document.activeElement !== targetInput) {
           targetInput.value = calculatedTarget > 0 ? calculatedTarget : "";
         }
-      } else if (!val) {
+      } else if (!cleanVal) {
         localStorage.removeItem('scale_target_' + activeProject);
-        const targetInput = document.getElementById("projectTarget");
         if (targetInput && document.activeElement !== targetInput) {
           targetInput.value = "";
         }
       }
+
       updateDemandStatus();
       debouncedSyncProjectSettings(activeProject);
     }
-
 
     function setTargetPrompt() {
       if (!activeProject) {
@@ -854,9 +901,11 @@
         return;
       }
       const current = getProjectTarget(activeProject);
-      const val = prompt(`請輸入【${activeProject}】預計需求總量 (噸)：`, current || "100");
+      const val = prompt(`請輸入【${activeProject}】預計需求總量 (噸)：`, current || "600");
       if (val !== null) {
-        document.getElementById("projectTarget").value = val ? parseFloat(val) || "" : "";
+        const num = parseFloat(val);
+        const targetInput = document.getElementById("projectTarget");
+        if (targetInput) targetInput.value = (!isNaN(num) && num > 0) ? num : "";
         setProjectTarget(activeProject, val);
       }
     }
@@ -878,8 +927,6 @@
       debouncedSyncProjectSettings(pName);
     }
 
-
-
     function onWaitPhoneInput(val) {
       if (!activeProject) return;
       setProjectWaitPhone(activeProject, val);
@@ -899,8 +946,8 @@
         return;
       }
 
-      // 計算當前工地出貨累計
-      const siteRecords = currentRecords.filter(r => r.project === activeProject);
+      // 計算當前工地出貨累計（排除 __SET__ 設定記錄）
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
       const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
       const currentTon = totalKg / 1000;
 
