@@ -238,29 +238,29 @@
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
     </div>
     <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));">
-      <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府"></div>
-      <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路"></div>
+      <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府" oninput="onCustomerFormInput(this.value)"></div>
+      <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路" oninput="onProjectFormInput(this.value)"></div>
       <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
       <div>
         <label style="display:flex; justify-content:space-between;">
           <span>預計總量 (噸)</span>
           <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
         </label>
-        <input type="text" inputmode="decimal" id="projectTarget" placeholder="例如: 600" oninput="onTargetInput(this.value)">
+        <input type="text" inputmode="decimal" id="projectTarget" placeholder="例如: 600" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onTargetInput(this.value)">
       </div>
       <div>
         <label style="display:flex; justify-content:space-between;">
           <span style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</span>
           <span style="font-size:0.75rem; color:#718096;">可手key</span>
         </label>
-        <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
+        <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
       </div>
       <div>
         <label style="display:flex; justify-content:space-between;">
           <span style="color:#d69e2e; font-weight:700;">📞 等電話／車數</span>
           <span style="font-size:0.75rem; color:#718096;">現場調度</span>
         </label>
-        <input type="text" id="projectWaitPhoneInput" placeholder="例如: 2台等電話" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
+        <input type="text" id="projectWaitPhoneInput" placeholder="例如: 2台等電話" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
       </div>
     </div>
     <div style="display:flex; gap:6px; margin-top:2px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
@@ -838,27 +838,57 @@
       }
     }
 
-    // 當使用者在「預計總量 (噸)」輸入時：即時聯動推算「還要出 (噸)」
+    function onCustomerFormInput(val) {
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        meta.customer = (val || "").trim();
+      }
+    }
+
+    function onProjectFormInput(val) {
+      const clean = (val || "").trim();
+      if (!clean) return;
+      if (!knownProjects.has(clean)) {
+        const cVal = document.getElementById("customer").value.trim();
+        const mVal = document.getElementById("material").value.trim();
+        knownProjects.set(clean, { customer: cVal, material: mVal, count: 0 });
+      }
+      activeProject = clean;
+      const tVal = getProjectTarget(clean);
+      const targetInput = document.getElementById("projectTarget");
+      if (targetInput && document.activeElement !== targetInput) {
+        targetInput.value = tVal > 0 ? tVal : "";
+      }
+      const wVal = getProjectWaitPhone(clean);
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      if (waitPhoneInput && document.activeElement !== waitPhoneInput) {
+        waitPhoneInput.value = wVal;
+      }
+      updateDemandStatus();
+      renderProjectTabs();
+      renderTable();
+    }
+
+    // 當使用者在「預計總量 (噸)」輸入時：即時聯動推算「還要出 (噸)」與下方狀態列
     function onTargetInput(val) {
       if (!activeProject) return;
       const cleanVal = (val || "").trim();
       const num = parseFloat(cleanVal);
-      if (!isNaN(num) && num > 0) {
+      const remainingInput = document.getElementById("projectRemainingInput");
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      if (!isNaN(num) && num >= 0) {
         localStorage.setItem('scale_target_' + activeProject, num);
+        // 同步更新「還要出」欄位（若使用者當前未在還要出欄位打字）
+        if (remainingInput && document.activeElement !== remainingInput) {
+          const rem = Math.max(0, Math.round((num - currentTon) * 100) / 100);
+          remainingInput.value = rem;
+        }
       } else {
         localStorage.removeItem('scale_target_' + activeProject);
-      }
-
-      // 同步更新「還要出」欄位（若使用者當前未在還要出欄位打字）
-      const remainingInput = document.getElementById("projectRemainingInput");
-      if (remainingInput && document.activeElement !== remainingInput) {
-        const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
-        const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
-        const currentTon = totalKg / 1000;
-        if (!isNaN(num) && num > 0) {
-          const rem = Math.round((num - currentTon) * 100) / 100;
-          remainingInput.value = rem > 0 ? rem : "0";
-        } else {
+        if (remainingInput && document.activeElement !== remainingInput) {
           remainingInput.value = "";
         }
       }
@@ -882,7 +912,7 @@
         const calculatedTarget = Math.round((currentTon + remNum) * 100) / 100;
         localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
         if (targetInput && document.activeElement !== targetInput) {
-          targetInput.value = calculatedTarget > 0 ? calculatedTarget : "";
+          targetInput.value = calculatedTarget;
         }
       } else if (!cleanVal) {
         localStorage.removeItem('scale_target_' + activeProject);
