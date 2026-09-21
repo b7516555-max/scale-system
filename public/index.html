@@ -257,21 +257,20 @@
         <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
       </div>
       <div>
-        <label style="display:flex; justify-content:space-between;">
-          <span style="color:#d69e2e; font-weight:700;">📞 等電話／車數</span>
-          <span style="font-size:0.75rem; color:#718096;">現場調度</span>
-        </label>
-        <input type="text" id="projectWaitPhoneInput" placeholder="例如: 2台等電話" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label style="margin-bottom:0; color:#d69e2e; font-weight:700;">📞 等電話／車數</label>
+          <select id="waitPhoneQuickSelect" style="width:auto; padding:2px 6px; font-size:0.78rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
+            <option value="">-- 快選下拉 --</option>
+            <option value="1台等電話">📞 1台等電話</option>
+            <option value="2台等電話">📞 2台等電話</option>
+            <option value="3台等電話">📞 3台等電話</option>
+            <option value="全數等電話通知">⚠️ 全數等電話通知</option>
+            <option value="正常出車">✅ 正常出車</option>
+            <option value="CLEAR">✕ 清除</option>
+          </select>
+        </div>
+        <input type="text" id="projectWaitPhoneInput" placeholder="可選上方快選或手動輸入" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
       </div>
-    </div>
-    <div style="display:flex; gap:6px; margin-top:2px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
-      <span style="font-size:0.78rem; color:#718096;">快選等電話：</span>
-      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('1台等電話')">📞 1台等電話</button>
-      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('2台等電話')">📞 2台等電話</button>
-      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('3台等電話')">📞 3台等電話</button>
-      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('全數等電話通知')">⚠️ 全數等電話通知</button>
-      <button type="button" class="quick-item-btn" onclick="applyWaitPhoneTag('正常出車')">✅ 正常出車</button>
-      <button type="button" class="quick-item-btn" style="color:#e53e3e;" onclick="applyWaitPhoneTag('')">✕ 清除</button>
     </div>
     <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -997,6 +996,16 @@
     function onWaitPhoneInput(val) {
       if (!activeProject) return;
       setProjectWaitPhone(activeProject, val);
+    }
+
+    function applyWaitPhoneSelect(val) {
+      if (!activeProject) return;
+      const targetVal = (val === 'CLEAR') ? '' : val;
+      const input = document.getElementById("projectWaitPhoneInput");
+      if (input) input.value = targetVal;
+      setProjectWaitPhone(activeProject, targetVal);
+      const select = document.getElementById("waitPhoneQuickSelect");
+      if (select) select.value = "";
     }
 
     function applyWaitPhoneTag(tag) {
