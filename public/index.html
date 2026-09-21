@@ -37,7 +37,7 @@
     }
     .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.9rem; display: flex; justify-content: space-between; }
     .autocomplete-item:hover { background-color: #ebf8ff; color: #0052cc; font-weight: 600; }
-    .server-setting-bar { background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
+    .server-setting-bar { display: none; background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
     .server-setting-bar input { width: 320px; padding: 6px 10px; font-size: 0.85rem; }
     .badge-cloud { background: #3182ce; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
     .quick-item-btn {
@@ -212,12 +212,13 @@
       <h1 style="margin: 0; font-size: 1.3rem; color: #1a202c; font-weight: 800;">地磅調度出貨系統</h1>
       <span class="badge-edit-mode">✍️ 編輯版</span>
     </div>
-    <div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button onclick="toggleServerBar()" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:0.85rem; padding:4px;" title="API伺服器設定">⚙️</button>
       <a href="view.html" class="nav-switch-btn">📱 前往「查詢版」</a>
     </div>
   </div>
 
-  <div class="server-setting-bar">
+  <div class="server-setting-bar" id="serverSettingBar">
     <div style="display: flex; align-items: center; gap: 8px;">
       <span class="badge-cloud">雲端後端</span>
       <span>API 伺服器：</span>
@@ -689,6 +690,12 @@
       if (current) {
         document.getElementById("apiStatusText").textContent = '連線至: ' + current;
       }
+    }
+
+    function toggleServerBar() {
+      const bar = document.getElementById("serverSettingBar");
+      if (!bar) return;
+      bar.style.display = (bar.style.display === "flex") ? "none" : "flex";
     }
 
     function saveApiServer() {
