@@ -72,7 +72,7 @@
       ...item,
       customer: item.customer != null ? String(item.customer) : '',
       project: item.project != null ? String(item.project) : '',
-      material: item.material != null ? String(item.material) : '',
+      material: (item.material != null && !/^\d{4}-\d{2}-\d{2}T/.test(String(item.material))) ? String(item.material) : (item.material != null && /^\d{4}-\d{2}-\d{2}T/.test(String(item.material)) ? '1/2密集配' : ''),
       driver: item.driver != null ? String(item.driver) : '-',
       plate: item.plate != null ? String(item.plate) : '',
       weight: Number(item.weight) || 0,

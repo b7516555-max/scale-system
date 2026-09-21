@@ -240,7 +240,7 @@
     <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));">
       <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府" oninput="onCustomerFormInput(this.value)"></div>
       <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路" oninput="onProjectFormInput(this.value)"></div>
-      <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配"></div>
+      <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配" oninput="onMaterialFormInput(this.value)"></div>
       <div>
         <label style="display:flex; justify-content:space-between;">
           <span>預計總量 (噸)</span>
@@ -724,16 +724,29 @@
         knownProjects.set(formP, { customer: formC, material: formM, count: 0 });
       }
 
+      // 檢查是否有前次保留的 activeProject
+      const savedActive = localStorage.getItem('scale_active_project');
+      if (savedActive && knownProjects.has(savedActive)) {
+        activeProject = savedActive;
+      }
+
       // 如果尚未選定 activeProject 或當前 activeProject 不存在於個別工地清單中，自動選取第一個個別工地
       if (!activeProject || !knownProjects.has(activeProject)) {
         const firstKey = knownProjects.keys().next().value;
         if (firstKey) {
           activeProject = firstKey;
-          const meta = knownProjects.get(firstKey);
-          document.getElementById("project").value = firstKey;
-          if (meta.customer) document.getElementById("customer").value = meta.customer;
-          if (meta.material) document.getElementById("material").value = meta.material;
         }
+      }
+
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        document.getElementById("project").value = activeProject;
+        const savedC = localStorage.getItem('scale_customer_' + activeProject);
+        const savedM = localStorage.getItem('scale_material_' + activeProject);
+        const cust = savedC || meta.customer;
+        const mat = savedM || meta.material;
+        if (cust) document.getElementById("customer").value = cust;
+        if (mat) document.getElementById("material").value = mat;
       }
     }
 
@@ -825,6 +838,7 @@
         if (existing) {
           payload.id = existing.id;
           await window.ScaleApi.postAction('updateDispatch', payload);
+          existing.material = settingJson;
         } else {
           const res = await window.ScaleApi.postAction('addDispatch', payload);
           if (res && res.success && res.data && currentRecords) {
@@ -839,9 +853,24 @@
     }
 
     function onCustomerFormInput(val) {
+      const clean = (val || "").trim();
       if (activeProject && knownProjects.has(activeProject)) {
         const meta = knownProjects.get(activeProject);
-        meta.customer = (val || "").trim();
+        meta.customer = clean;
+      }
+      if (activeProject) {
+        localStorage.setItem('scale_customer_' + activeProject, clean);
+      }
+    }
+
+    function onMaterialFormInput(val) {
+      const clean = (val || "").trim();
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        meta.material = clean;
+      }
+      if (activeProject) {
+        localStorage.setItem('scale_material_' + activeProject, clean);
       }
     }
 
@@ -854,6 +883,7 @@
         knownProjects.set(clean, { customer: cVal, material: mVal, count: 0 });
       }
       activeProject = clean;
+      localStorage.setItem('scale_active_project', clean);
       const tVal = getProjectTarget(clean);
       const targetInput = document.getElementById("projectTarget");
       if (targetInput && document.activeElement !== targetInput) {
@@ -1046,11 +1076,16 @@
 
     function switchProjectTab(pName) {
       activeProject = pName;
+      if (pName) localStorage.setItem('scale_active_project', pName);
       if (knownProjects.has(pName)) {
         const meta = knownProjects.get(pName);
         document.getElementById("project").value = pName;
-        if (meta.customer) document.getElementById("customer").value = meta.customer;
-        if (meta.material) document.getElementById("material").value = meta.material;
+        const savedC = localStorage.getItem('scale_customer_' + pName);
+        const savedM = localStorage.getItem('scale_material_' + pName);
+        const cust = savedC || meta.customer;
+        const mat = savedM || meta.material;
+        if (cust) document.getElementById("customer").value = cust;
+        if (mat) document.getElementById("material").value = mat;
       }
       const tVal = getProjectTarget(pName);
       const targetInput = document.getElementById("projectTarget");
