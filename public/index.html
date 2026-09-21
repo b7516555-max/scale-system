@@ -767,15 +767,25 @@
       return val ? parseFloat(val) : 0;
     }
 
+    let syncSettingsTimer = null;
+
     function setProjectTarget(pName, val) {
       if (!pName) return;
-      if (val && parseFloat(val) > 0) {
-        localStorage.setItem('scale_target_' + pName, parseFloat(val));
+      const num = parseFloat(val);
+      if (!isNaN(num) && num > 0) {
+        localStorage.setItem('scale_target_' + pName, num);
       } else {
         localStorage.removeItem('scale_target_' + pName);
       }
       updateDemandStatus();
-      syncProjectSettingsToCloud(pName);
+      debouncedSyncProjectSettings(pName);
+    }
+
+    function debouncedSyncProjectSettings(pName) {
+      if (syncSettingsTimer) clearTimeout(syncSettingsTimer);
+      syncSettingsTimer = setTimeout(() => {
+        syncProjectSettingsToCloud(pName);
+      }, 600);
     }
 
     // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets 的特殊記錄，讓手機端也能讀取
@@ -786,7 +796,6 @@
       const waitPhone = getProjectWaitPhone(pName) || '';
       const settingJson = JSON.stringify({ target, wait: waitPhone });
       try {
-        // 找看看 currentRecords 裡有沒有此工地的 __SET__ 記錄
         const existing = (currentRecords || []).find(r => r.plate === '__SET__' && r.customer === pName);
         const payload = {
           customer: pName, project: '__SETTINGS__',
@@ -799,15 +808,13 @@
         } else {
           const res = await window.ScaleApi.postAction('addDispatch', payload);
           if (res && res.success && res.data && currentRecords) {
-            currentRecords.push(res.data); // 加入本地，避免下次重複新增
+            currentRecords.push(res.data);
           }
         }
       } catch (err) {
         console.warn('工程設定同步失敗 (不影響本機操作):', err);
       }
     }
-
-
 
     function onTargetInput(val) {
       if (!activeProject) return;
@@ -817,7 +824,7 @@
     // 當使用者直接在「還要出多少 (噸)」手 key 時，自動反推預計需求總量 = 當前已出噸數 + 還要出的噸數
     function onRemainingInput(val) {
       if (!activeProject) return;
-      const siteRecords = currentRecords.filter(r => r.project === activeProject);
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
       const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
       const currentTon = totalKg / 1000;
 
@@ -826,15 +833,20 @@
         const calculatedTarget = Math.round((currentTon + remNum) * 100) / 100;
         localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
         const targetInput = document.getElementById("projectTarget");
-        if (targetInput) targetInput.value = calculatedTarget > 0 ? calculatedTarget : "";
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = calculatedTarget > 0 ? calculatedTarget : "";
+        }
       } else if (!val) {
         localStorage.removeItem('scale_target_' + activeProject);
         const targetInput = document.getElementById("projectTarget");
-        if (targetInput) targetInput.value = "";
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = "";
+        }
       }
       updateDemandStatus();
-      syncProjectSettingsToCloud(activeProject);
+      debouncedSyncProjectSettings(activeProject);
     }
+
 
     function setTargetPrompt() {
       if (!activeProject) {
@@ -863,8 +875,9 @@
         localStorage.removeItem('scale_wait_phone_' + pName);
       }
       updateDemandStatus();
-      syncProjectSettingsToCloud(pName);
+      debouncedSyncProjectSettings(pName);
     }
+
 
 
     function onWaitPhoneInput(val) {
@@ -1033,8 +1046,10 @@
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
+        updateDemandStatus();
         const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
         document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
+
       } catch (err) {
         console.error('讀取失敗:', err);
         document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
