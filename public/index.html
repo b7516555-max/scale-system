@@ -1085,7 +1085,25 @@
       document.getElementById("cargoQuickSelect").value = "";
     }
 
-    let currentRecords = [];
+    const STORAGE_RECORDS_CACHE_KEY = 'scale_records_cache_v1';
+    function loadCachedRecords() {
+      try {
+        const cached = localStorage.getItem(STORAGE_RECORDS_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+      return [];
+    }
+
+    function saveCachedRecords(records) {
+      try {
+        localStorage.setItem(STORAGE_RECORDS_CACHE_KEY, JSON.stringify(records || []));
+      } catch (e) {}
+    }
+
+    let currentRecords = loadCachedRecords();
     let activeProject = "";
     let knownProjects = new Map(); // project -> { customer, material, count }
     let editingDispatchId = null; // 當前正在編輯的車次 ID
@@ -1676,6 +1694,7 @@
           }
         });
 
+        saveCachedRecords(currentRecords);
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
@@ -1863,9 +1882,52 @@
       submitBtn.disabled = true;
       submitBtn.textContent = isEditing ? "正在儲存修改..." : "正在儲存...";
 
+      // 備份原始紀錄以便失敗時回滾
+      const originalRecords = [...currentRecords];
+
+      // 樂觀更新 (Optimistic UI)：0 秒立即反應在表格、累計與需求統計上，不必等待 GAS
+      if (isEditing) {
+        const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(editingDispatchId));
+        if (targetIdx !== -1) {
+          currentRecords[targetIdx] = {
+            ...currentRecords[targetIdx],
+            ...payload,
+            id: editingDispatchId
+          };
+        }
+        cancelEditEntry();
+      } else {
+        // 先給予暫時的臨時 ID，立即加入表格並清空表單，讓操作者能馬上記錄下一車
+        const tempId = Date.now();
+        const optimisticRecord = {
+          id: tempId,
+          ...payload,
+          created_at: new Date().toISOString()
+        };
+        currentRecords.unshift(optimisticRecord);
+
+        // 清空表單欄位供下一車輸入
+        document.getElementById("driver").value = "";
+        document.getElementById("cargo_notes").value = "";
+        document.getElementById("cargoQuickSelect").value = "";
+        document.getElementById("plate").value = "";
+        document.getElementById("weight").value = "";
+        document.getElementById("exit_time").value = "";
+      }
+
+      // 立即重繪畫面與總重統計 (0 秒無延遲)
+      saveCachedRecords(currentRecords);
+      updateKnownProjects();
+      renderProjectTabs();
+      renderTable();
+      updateDemandStatus();
+
+      // 背景發送至 Google Apps Script 雲端試算表
+      const statusEl = document.getElementById("apiStatusText");
+      if (statusEl) statusEl.textContent = '正在同步雲端...';
+
       try {
         if (isEditing) {
-          // 修改車次流程：優先嘗試 updateDispatch；若舊後端未更新則以 delete + add 相容更新
           payload.id = editingDispatchId;
           try {
             await window.ScaleApi.postAction('updateDispatch', payload);
@@ -1874,24 +1936,27 @@
             await window.ScaleApi.postAction('deleteDispatch', { id: editingDispatchId });
             await window.ScaleApi.postAction('addDispatch', payload);
           }
-          alert("車次紀錄已成功更新！");
-          cancelEditEntry();
         } else {
-          // 新增車次流程
-          await window.ScaleApi.postAction('addDispatch', payload);
-          document.getElementById("driver").value = "";
-          document.getElementById("cargo_notes").value = "";
-          document.getElementById("cargoQuickSelect").value = "";
-          document.getElementById("plate").value = "";
-          document.getElementById("weight").value = "";
-          document.getElementById("exit_time").value = "";
+          const res = await window.ScaleApi.postAction('addDispatch', payload);
+          if (res && res.success && res.data) {
+            // 用雲端回傳的正式 ID 替換臨時 ID
+            const idx = currentRecords.findIndex(r => r.plate === payload.plate && r.weight === payload.weight);
+            if (idx !== -1) {
+              currentRecords[idx].id = res.data.id;
+            }
+          }
         }
-        await loadRecords();
+        const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+        if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
       } catch (err) {
-        alert((isEditing ? "修改失敗: " : "儲存失敗: ") + err.message);
+        console.error("雲端儲存失敗，進行資料回滾:", err);
+        alert((isEditing ? "雲端修改同步失敗: " : "雲端儲存同步失敗: ") + err.message);
+        currentRecords = originalRecords;
+        renderTable();
+        updateDemandStatus();
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = isEditing ? "💾 儲存修改" : "儲存並發送";
+        submitBtn.textContent = "儲存並發送";
       }
     }
 
@@ -1901,6 +1966,7 @@
       // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除與重新計算累計
       const originalRecords = [...currentRecords];
       currentRecords = currentRecords.filter(r => r.id !== id);
+      saveCachedRecords(currentRecords);
       renderTable();
       document.getElementById("apiStatusText").textContent = '正在同步刪除雲端紀錄...';
 
@@ -2006,6 +2072,12 @@
     }
 
     initApiConfig();
+    // 優先立即使用快取呈現畫面 (0 秒載入，不等待網路)
+    updateKnownProjects();
+    renderProjectTabs();
+    renderTable();
+    updateDemandStatus();
+    // 背景同步最新雲端資料
     loadRecords();
   </script>
 </body>
