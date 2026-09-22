@@ -495,7 +495,7 @@
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" class="btn-secondary" style="padding: 6px 14px; display: none;" id="btnCancelProjectEdit" onclick="cancelProjectEdit()">取消修改</button>
-            <button type="button" class="btn-primary" style="padding: 6px 18px;" onclick="saveProjectItem()">💾 儲存建檔</button>
+            <button type="button" class="btn-primary" style="padding: 6px 18px;" id="btnSaveProject" onclick="saveProjectItem()">💾 儲存建檔</button>
           </div>
         </div>
 
@@ -668,6 +668,19 @@
     // 工程 / 工地預先建檔與名單管理邏輯
     // ==========================================
     const STORAGE_PROJECT_KEY = 'scale_preset_projects_v2';
+    const STORAGE_REMOVED_PROJECTS_KEY = 'scale_removed_projects_v1';
+
+    function getRemovedProjects() {
+      try {
+        const saved = localStorage.getItem(STORAGE_REMOVED_PROJECTS_KEY);
+        if (saved) return new Set(JSON.parse(saved));
+      } catch (e) {}
+      return new Set();
+    }
+
+    function saveRemovedProjects(set) {
+      localStorage.setItem(STORAGE_REMOVED_PROJECTS_KEY, JSON.stringify(Array.from(set)));
+    }
 
     function loadPresetProjects() {
       try {
@@ -772,6 +785,8 @@
       
       document.getElementById("projectFormTitle").textContent = `✏️ 編輯工程／工地：${item.name}`;
       document.getElementById("btnCancelProjectEdit").style.display = "inline-block";
+      const saveBtn = document.getElementById("btnSaveProject");
+      if (saveBtn) saveBtn.textContent = "💾 儲存修改";
       document.getElementById("mgrProjectName").focus();
     }
 
@@ -785,9 +800,11 @@
       document.getElementById("mgrProjectWaitPhone").value = "";
       document.getElementById("projectFormTitle").textContent = "➕ 預先建檔新工程／工地";
       document.getElementById("btnCancelProjectEdit").style.display = "none";
+      const saveBtn = document.getElementById("btnSaveProject");
+      if (saveBtn) saveBtn.textContent = "💾 儲存建檔";
     }
 
-    function saveProjectItem() {
+    async function saveProjectItem() {
       try {
         const name = document.getElementById("mgrProjectName").value.trim();
         const customer = document.getElementById("mgrProjectCustomer").value.trim();
@@ -813,21 +830,55 @@
         }
 
         const projectData = { name, customer, material, target, wait };
+        const isEditing = (editIdx >= 0 && editIdx < presetProjects.length);
 
-        if (editIdx >= 0 && editIdx < presetProjects.length) {
-          // 編輯既有工程
+        if (isEditing) {
           presetProjects[editIdx] = projectData;
+
+          // 若工程名稱有更動，連動更新舊有紀錄與相關快取
           if (oldName && oldName !== name) {
-            // 清除舊名稱的 localStorage 關聯
             localStorage.removeItem('scale_customer_' + oldName);
             localStorage.removeItem('scale_material_' + oldName);
             localStorage.removeItem('scale_target_' + oldName);
             localStorage.removeItem('scale_wait_phone_' + oldName);
+
+            // 更新記憶體中 currentRecords 的歷史過磅資料工地名稱
+            (currentRecords || []).forEach(r => {
+              if (r.project === oldName) r.project = name;
+            });
+
+            // 處理舊名稱對應的 __SET__ 雲端設定紀錄 (改名或刪除舊設定)
+            const oldSetRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === oldName);
+            oldSetRecords.forEach(r => {
+              r.customer = name;
+              if (window.ScaleApi) {
+                window.ScaleApi.postAction('updateDispatch', {
+                  id: r.id,
+                  customer: name,
+                  project: '__SETTINGS__',
+                  material: JSON.stringify({ target, wait }),
+                  driver: '-',
+                  plate: '__SET__',
+                  weight: 1,
+                  exit_time: '-'
+                }).catch(e => console.warn('更新舊工程雲端設定名失敗:', e));
+              }
+            });
+
+            // 標記舊名稱已移除，避免 loadRecords() 再次把舊名稱起死回生
+            const removedProjects = getRemovedProjects();
+            removedProjects.add(oldName);
+            saveRemovedProjects(removedProjects);
+
             if (activeProject === oldName) activeProject = name;
           }
         } else {
           // 新增建檔 (排在最前面)
           presetProjects.unshift(projectData);
+          // 若之前曾被刪除過，重新加入
+          const removedProjects = getRemovedProjects();
+          removedProjects.delete(name);
+          saveRemovedProjects(removedProjects);
         }
 
         // 存入 localStorage
@@ -835,12 +886,17 @@
 
         // 設定各別項目快取與目標噸數、等電話
         if (customer) localStorage.setItem('scale_customer_' + name, customer);
+        else localStorage.removeItem('scale_customer_' + name);
+
         if (material) localStorage.setItem('scale_material_' + name, material);
+        else localStorage.removeItem('scale_material_' + name);
+
         if (target > 0) {
           localStorage.setItem('scale_target_' + name, target);
         } else {
           localStorage.removeItem('scale_target_' + name);
         }
+
         if (wait) {
           localStorage.setItem('scale_wait_phone_' + name, wait);
         } else {
@@ -856,12 +912,16 @@
         renderProjectManagerTable();
         cancelProjectEdit();
 
-        // 自動切換到剛建檔的工地以便出車
+        // 切換到該工地
         switchProjectTab(name);
 
-        // 提示建檔成功，讓使用者清楚知道已建好，並可選擇繼續建檔或關閉
+        // 提示反饋
         setTimeout(() => {
-          alert(`✅ 工程【${name}】已成功建檔！\n頂部已新增該工地分頁。\n您可以繼續預建下一個工地，或點右上角✕開始出車。`);
+          if (isEditing) {
+            alert(`✅ 工程【${name}】設定已成功更新儲存！`);
+          } else {
+            alert(`✅ 工程【${name}】已成功建檔！\n頂部已新增該工地分頁。\n您可以繼續預建下一個工地，或點右上角✕開始出車。`);
+          }
         }, 50);
 
       } catch (err) {
@@ -877,7 +937,7 @@
       closeProjectManager();
     }
 
-    function deleteProjectItem(idx) {
+    async function deleteProjectItem(idx) {
       const item = presetProjects[idx];
       if (!item) return;
       if (!confirm(`確定要將工程地點【${item.name}】從名單中移除嗎？\n(注意：已出車之歷史資料仍會保留)`)) return;
@@ -886,11 +946,25 @@
       presetProjects.splice(idx, 1);
       savePresetProjects();
 
+      // 標記已從清單中移除，避免 loadRecords() 雲端同步時又自動加回來
+      const removedProjects = getRemovedProjects();
+      removedProjects.add(pName);
+      saveRemovedProjects(removedProjects);
+
       // 清除本地儲存
       localStorage.removeItem('scale_customer_' + pName);
       localStorage.removeItem('scale_material_' + pName);
       localStorage.removeItem('scale_target_' + pName);
       localStorage.removeItem('scale_wait_phone_' + pName);
+
+      // 同步清理雲端 __SET__ 記錄 (若存在)
+      const setRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+      setRecords.forEach(r => {
+        if (window.ScaleApi) {
+          window.ScaleApi.postAction('deleteDispatch', { id: r.id }).catch(e => console.warn('刪除雲端設定記錄失敗:', e));
+        }
+      });
+      currentRecords = (currentRecords || []).filter(r => !(r.plate === '__SET__' && r.customer === pName));
 
       if (activeProject === pName) {
         activeProject = "";
@@ -1042,11 +1116,12 @@
 
     function updateKnownProjects() {
       knownProjects.clear();
+      const removedProjects = getRemovedProjects();
 
       // 1. 先將預先建檔名單中的工程納入
       presetProjects.forEach(item => {
         const pName = (item.name || "").trim();
-        if (pName && !knownProjects.has(pName)) {
+        if (pName && !removedProjects.has(pName) && !knownProjects.has(pName)) {
           const cust = item.customer || localStorage.getItem('scale_customer_' + pName) || "";
           const mat = item.material || localStorage.getItem('scale_material_' + pName) || "";
           knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
@@ -1057,7 +1132,7 @@
       currentRecords.forEach(r => {
         if (r.plate === '__SET__') return; // 略過設定記錄
         const pName = r.project ? r.project.trim() : "";
-        if (pName) {
+        if (pName && !removedProjects.has(pName)) {
           if (!knownProjects.has(pName)) {
             knownProjects.set(pName, { customer: r.customer || "", material: r.material || "", count: 0 });
           }
@@ -1069,7 +1144,7 @@
       currentRecords.forEach(r => {
         if (r.plate === '__SET__' && r.customer) {
           const pName = r.customer.trim();
-          if (pName && !knownProjects.has(pName)) {
+          if (pName && !removedProjects.has(pName) && !knownProjects.has(pName)) {
             const cust = localStorage.getItem('scale_customer_' + pName) || "";
             const mat = localStorage.getItem('scale_material_' + pName) || "";
             knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
@@ -1536,12 +1611,18 @@
     async function loadRecords() {
       try {
         currentRecords = await window.ScaleApi.fetchDispatches();
+        const removedProjects = getRemovedProjects();
+
         // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage 與預先建檔清單
         currentRecords.filter(r => r.plate === '__SET__').forEach(r => {
           try {
             const cfg = JSON.parse(r.material || '{}');
             const pName = (r.customer || '').trim();
             if (pName) {
+              if (removedProjects.has(pName)) {
+                // 若此工程先前已在管理面板被移除或改名，則忽略該過時設定
+                return;
+              }
               // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
               if (!pendingSyncProjects.has(pName)) {
                 if (cfg.target > 0) {
@@ -1576,11 +1657,11 @@
           } catch(e) {}
         });
 
-        // 同時將已出車記錄中出現過的工程地點也納入預先建檔名單（若尚未建檔）
+        // 同時將已出車記錄中出現過的工程地點也納入預先建檔名單（若尚未建檔且未被使用者手動移除）
         currentRecords.forEach(r => {
           if (r.plate === '__SET__') return;
           const pName = (r.project || '').trim();
-          if (pName) {
+          if (pName && !removedProjects.has(pName)) {
             let found = presetProjects.find(p => p.name === pName);
             if (!found) {
               presetProjects.push({
