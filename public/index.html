@@ -787,8 +787,6 @@
       return val ? parseFloat(val) : 0;
     }
 
-    let syncSettingsTimer = null;
-
     function setSyncStatusBadge(status, text) {
       const badge = document.getElementById("projectSyncBadge");
       if (!badge) return;
@@ -820,12 +818,35 @@
       debouncedSyncProjectSettings(pName);
     }
 
+    let syncSettingsTimer = null;
+    let isSyncingSettings = false;
+    let pendingSyncProjects = new Set();
+
     function debouncedSyncProjectSettings(pName) {
+      if (!pName) return;
+      pendingSyncProjects.add(pName);
       setSyncStatusBadge('syncing', '正在儲存...');
       if (syncSettingsTimer) clearTimeout(syncSettingsTimer);
-      syncSettingsTimer = setTimeout(() => {
-        syncProjectSettingsToCloud(pName);
-      }, 600);
+      syncSettingsTimer = setTimeout(async () => {
+        await processPendingSyncProjects();
+      }, 500);
+    }
+
+    async function processPendingSyncProjects() {
+      if (isSyncingSettings || pendingSyncProjects.size === 0) return;
+      isSyncingSettings = true;
+      try {
+        while (pendingSyncProjects.size > 0) {
+          const pName = pendingSyncProjects.values().next().value;
+          pendingSyncProjects.delete(pName);
+          await syncProjectSettingsToCloud(pName);
+        }
+      } finally {
+        isSyncingSettings = false;
+        if (pendingSyncProjects.size > 0) {
+          processPendingSyncProjects();
+        }
+      }
     }
 
     // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets 的特殊記錄，讓手機端也能讀取
@@ -835,7 +856,8 @@
       const waitPhone = getProjectWaitPhone(pName) || '';
       const settingJson = JSON.stringify({ target, wait: waitPhone });
       try {
-        const existing = (currentRecords || []).find(r => r.plate === '__SET__' && r.customer === pName);
+        const existingList = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+        const existing = existingList[0];
         const payload = {
           customer: pName, project: '__SETTINGS__',
           material: settingJson, driver: '-',
@@ -1165,9 +1187,18 @@
             const cfg = JSON.parse(r.material || '{}');
             const pName = r.customer;
             if (pName) {
-              if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
-              if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-              else localStorage.removeItem('scale_wait_phone_' + pName);
+              // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
+              if (pendingSyncProjects.has(pName)) return;
+              if (cfg.target > 0) {
+                localStorage.setItem('scale_target_' + pName, cfg.target);
+              } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
+                // 如果本機本來就沒有或為0，保持乾淨
+              }
+              if (cfg.wait) {
+                localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+              } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
+                localStorage.removeItem('scale_wait_phone_' + pName);
+              }
             }
           } catch(e) {}
         });

@@ -348,8 +348,26 @@
 
       document.getElementById('mDispatchedTon').textContent = dispatchedTon.toFixed(2);
 
-      if (targetTon > 0) {
+      // 呈現現場調度等電話狀態 (純唯讀提示)
+      const waitPhone = getProjectWaitPhone(activeProject);
+      const alertBox = document.getElementById('mWaitPhoneAlert');
+      const textEl = document.getElementById('mWaitPhoneText');
+      if (alertBox && textEl) {
+        if (waitPhone) {
+          textEl.textContent = waitPhone;
+          alertBox.style.display = 'flex';
+        } else {
+          alertBox.style.display = 'none';
+        }
+      }
+
+      if (targetTon > 0 || waitPhone) {
         banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      if (targetTon > 0) {
         document.getElementById('mTargetTon').textContent = targetTon.toFixed(1);
         const remainingTon = Math.max(0, targetTon - dispatchedTon);
         const remainEl = document.getElementById('mRemainingTon');
@@ -376,28 +394,15 @@
           progressFillEl.style.background = '#3182ce';
         }
       } else {
-        // 未設定目標時，僅顯示簡易看板
+        // 未設定目標時
         document.getElementById('mTargetTon').textContent = '未設定';
         const remainEl = document.getElementById('mRemainingTon');
-        remainEl.textContent = '請點右上設定';
+        remainEl.textContent = waitPhone ? '依調度指示' : '未設定';
         remainEl.className = 'demand-stat-value';
         remainEl.style.color = '#718096';
         remainEl.style.fontSize = '0.95rem';
-        document.getElementById('mEstTrucksHint').textContent = '點選上方「✎ 設定目標噸數」';
+        document.getElementById('mEstTrucksHint').textContent = waitPhone ? `注意：${waitPhone}` : '未設定目標噸數';
         document.getElementById('mProgressFill').style.width = '0%';
-      }
-
-      // 呈現現場調度等電話狀態 (純唯讀提示)
-      const waitPhone = getProjectWaitPhone(activeProject);
-      const alertBox = document.getElementById('mWaitPhoneAlert');
-      const textEl = document.getElementById('mWaitPhoneText');
-      if (alertBox && textEl) {
-        if (waitPhone) {
-          textEl.textContent = waitPhone;
-          alertBox.style.display = 'flex';
-        } else {
-          alertBox.style.display = 'none';
-        }
       }
     }
 
