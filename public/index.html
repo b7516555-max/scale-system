@@ -457,11 +457,11 @@
   </div>
 
   <!-- 工地與工程預先建檔管理彈窗 -->
-  <div class="modal-overlay" id="projectModalOverlay" onclick="closeProjectManagerIfOutside(event)">
+  <div class="modal-overlay" id="projectModalOverlay">
     <div class="modal-box" style="max-width: 780px;">
       <div class="modal-header">
         <h3>🏗️ 工程／工地名單建檔與管理</h3>
-        <button class="modal-close-btn" onclick="closeProjectManager()">✕</button>
+        <button type="button" class="modal-close-btn" onclick="closeProjectManager()">✕</button>
       </div>
       <div class="modal-body">
         <div style="background: #f8fafc; padding: 14px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 14px;">
@@ -494,8 +494,8 @@
             </div>
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 8px;">
-            <button class="btn-secondary" style="padding: 6px 14px; display: none;" id="btnCancelProjectEdit" onclick="cancelProjectEdit()">取消修改</button>
-            <button class="btn-primary" style="padding: 6px 18px;" onclick="saveProjectItem()">💾 儲存建檔</button>
+            <button type="button" class="btn-secondary" style="padding: 6px 14px; display: none;" id="btnCancelProjectEdit" onclick="cancelProjectEdit()">取消修改</button>
+            <button type="button" class="btn-primary" style="padding: 6px 18px;" onclick="saveProjectItem()">💾 儲存建檔</button>
           </div>
         </div>
 
@@ -788,76 +788,86 @@
     }
 
     function saveProjectItem() {
-      const name = document.getElementById("mgrProjectName").value.trim();
-      const customer = document.getElementById("mgrProjectCustomer").value.trim();
-      const material = document.getElementById("mgrProjectMaterial").value.trim();
-      const rawTarget = document.getElementById("mgrProjectTarget").value.trim();
-      const target = parseFloat(rawTarget) || 0;
-      const wait = document.getElementById("mgrProjectWaitPhone").value.trim();
-      const editIdx = parseInt(document.getElementById("editProjectIndex").value, 10);
-      const oldName = document.getElementById("editProjectOldName").value.trim();
+      try {
+        const name = document.getElementById("mgrProjectName").value.trim();
+        const customer = document.getElementById("mgrProjectCustomer").value.trim();
+        const material = document.getElementById("mgrProjectMaterial").value.trim();
+        const rawTarget = document.getElementById("mgrProjectTarget").value.trim();
+        const target = parseFloat(rawTarget) || 0;
+        const wait = document.getElementById("mgrProjectWaitPhone").value.trim();
+        const editIdx = parseInt(document.getElementById("editProjectIndex").value, 10);
+        const oldName = document.getElementById("editProjectOldName").value.trim();
 
-      if (!name) {
-        alert("請輸入工程名稱 / 地點！");
-        document.getElementById("mgrProjectName").focus();
-        return;
-      }
-
-      // 檢查是否與其他既有工程同名
-      const duplicateIdx = presetProjects.findIndex((p, i) => p.name === name && i !== editIdx);
-      if (duplicateIdx !== -1) {
-        alert(`工程名稱【${name}】已存在，請勿重複命名！`);
-        document.getElementById("mgrProjectName").focus();
-        return;
-      }
-
-      const projectData = { name, customer, material, target, wait };
-
-      if (editIdx >= 0 && editIdx < presetProjects.length) {
-        // 編輯既有工程
-        presetProjects[editIdx] = projectData;
-        if (oldName && oldName !== name) {
-          // 清除舊名稱的 localStorage 關聯
-          localStorage.removeItem('scale_customer_' + oldName);
-          localStorage.removeItem('scale_material_' + oldName);
-          localStorage.removeItem('scale_target_' + oldName);
-          localStorage.removeItem('scale_wait_phone_' + oldName);
-          if (activeProject === oldName) activeProject = name;
+        if (!name) {
+          alert("請輸入工程名稱 / 地點！");
+          document.getElementById("mgrProjectName").focus();
+          return;
         }
-      } else {
-        // 新增建檔 (排在最前面)
-        presetProjects.unshift(projectData);
+
+        // 檢查是否與其他既有工程同名
+        const duplicateIdx = presetProjects.findIndex((p, i) => p.name === name && i !== editIdx);
+        if (duplicateIdx !== -1) {
+          alert(`工程名稱【${name}】已存在，請勿重複命名！`);
+          document.getElementById("mgrProjectName").focus();
+          return;
+        }
+
+        const projectData = { name, customer, material, target, wait };
+
+        if (editIdx >= 0 && editIdx < presetProjects.length) {
+          // 編輯既有工程
+          presetProjects[editIdx] = projectData;
+          if (oldName && oldName !== name) {
+            // 清除舊名稱的 localStorage 關聯
+            localStorage.removeItem('scale_customer_' + oldName);
+            localStorage.removeItem('scale_material_' + oldName);
+            localStorage.removeItem('scale_target_' + oldName);
+            localStorage.removeItem('scale_wait_phone_' + oldName);
+            if (activeProject === oldName) activeProject = name;
+          }
+        } else {
+          // 新增建檔 (排在最前面)
+          presetProjects.unshift(projectData);
+        }
+
+        // 存入 localStorage
+        savePresetProjects();
+
+        // 設定各別項目快取與目標噸數、等電話
+        if (customer) localStorage.setItem('scale_customer_' + name, customer);
+        if (material) localStorage.setItem('scale_material_' + name, material);
+        if (target > 0) {
+          localStorage.setItem('scale_target_' + name, target);
+        } else {
+          localStorage.removeItem('scale_target_' + name);
+        }
+        if (wait) {
+          localStorage.setItem('scale_wait_phone_' + name, wait);
+        } else {
+          localStorage.removeItem('scale_wait_phone_' + name);
+        }
+
+        // 同步設定到雲端 __SET__ 記錄
+        debouncedSyncProjectSettings(name);
+
+        // 更新 knownProjects 與頂部分頁
+        updateKnownProjects();
+        renderProjectTabs();
+        renderProjectManagerTable();
+        cancelProjectEdit();
+
+        // 自動切換到剛建檔的工地以便出車
+        switchProjectTab(name);
+
+        // 提示建檔成功，讓使用者清楚知道已建好，並可選擇繼續建檔或關閉
+        setTimeout(() => {
+          alert(`✅ 工程【${name}】已成功建檔！\n頂部已新增該工地分頁。\n您可以繼續預建下一個工地，或點右上角✕開始出車。`);
+        }, 50);
+
+      } catch (err) {
+        console.error("儲存工程建檔失敗:", err);
+        alert("儲存工程失敗: " + err.message);
       }
-
-      // 存入 localStorage
-      savePresetProjects();
-
-      // 設定各別項目快取與目標噸數、等電話
-      if (customer) localStorage.setItem('scale_customer_' + name, customer);
-      if (material) localStorage.setItem('scale_material_' + name, material);
-      if (target > 0) {
-        localStorage.setItem('scale_target_' + name, target);
-      } else {
-        localStorage.removeItem('scale_target_' + name);
-      }
-      if (wait) {
-        localStorage.setItem('scale_wait_phone_' + name, wait);
-      } else {
-        localStorage.removeItem('scale_wait_phone_' + name);
-      }
-
-      // 同步設定到雲端 __SET__ 記錄
-      debouncedSyncProjectSettings(name);
-
-      // 更新 knownProjects
-      updateKnownProjects();
-      renderProjectTabs();
-      renderProjectManagerTable();
-      cancelProjectEdit();
-
-      // 詢問或自動切換至剛建檔的工地以便立馬出車
-      switchProjectTab(name);
-      closeProjectManager();
     }
 
     function selectProjectFromManager(idx) {
@@ -1565,6 +1575,26 @@
             }
           } catch(e) {}
         });
+
+        // 同時將已出車記錄中出現過的工程地點也納入預先建檔名單（若尚未建檔）
+        currentRecords.forEach(r => {
+          if (r.plate === '__SET__') return;
+          const pName = (r.project || '').trim();
+          if (pName) {
+            let found = presetProjects.find(p => p.name === pName);
+            if (!found) {
+              presetProjects.push({
+                name: pName,
+                customer: r.customer || localStorage.getItem('scale_customer_' + pName) || "",
+                material: r.material || localStorage.getItem('scale_material_' + pName) || "",
+                target: getProjectTarget(pName) || 0,
+                wait: getProjectWaitPhone(pName) || ""
+              });
+              savePresetProjects();
+            }
+          }
+        });
+
         updateKnownProjects();
         renderProjectTabs();
         renderTable();
