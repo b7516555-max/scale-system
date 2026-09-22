@@ -9,10 +9,17 @@
     .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
     h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #0052cc; padding-bottom: 8px; color: #0052cc; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
-    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 4px; }
-    input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; font-size: 0.95rem; }
-    input:focus { outline: none; border-color: #0052cc; }
-    button { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+    .form-col { display: flex; flex-direction: column; }
+    .form-label-row { display: flex; justify-content: space-between; align-items: center; min-height: 24px; margin-bottom: 4px; }
+    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 4px; line-height: 1.2; }
+    .form-label-row label { margin-bottom: 0; }
+    input, select {
+      width: 100%; height: 38px; padding: 7px 10px; border: 1px solid #cbd5e0;
+      border-radius: 4px; box-sizing: border-box; font-size: 0.92rem;
+      font-family: inherit; vertical-align: middle;
+    }
+    input:focus, select:focus { outline: none; border-color: #0052cc; }
+    button { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem; font-family: inherit; }
     .btn-primary { background: #0052cc; color: white; }
     .btn-primary:hover { background: #0747a6; }
     .btn-secondary { background: #e2e8f0; color: #2d3748; }
@@ -22,7 +29,7 @@
     .summary-bar { background: #ebf8ff; border: 1px solid #bee3f8; padding: 14px 20px; border-radius: 6px; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 24px; font-size: 1rem; align-items: center; }
     .highlight { color: #c53030; font-weight: 700; font-size: 1.15rem; }
     .range-box { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; }
-    .range-box input { width: 75px; }
+    .range-box input { width: 75px; height: 34px; }
     .del-btn { background: none; border: none; color: #e53e3e; cursor: pointer; font-weight: 600; padding: 2px 4px; }
     .del-btn:hover { text-decoration: underline; }
     .edit-row-btn { background: none; border: none; color: #0052cc; cursor: pointer; font-weight: 600; padding: 2px 4px; margin-right: 4px; }
@@ -238,28 +245,37 @@
       <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
     </div>
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));">
-      <div><label>客戶名稱</label><input type="text" id="customer" value="高雄市政府" oninput="onCustomerFormInput(this.value)"></div>
-      <div><label>工程名稱 / 地點</label><input type="text" id="project" value="苓雅區武慶三路" oninput="onProjectFormInput(this.value)"></div>
-      <div><label>品名 / 料別</label><input type="text" id="material" value="1/2密集配" oninput="onMaterialFormInput(this.value)"></div>
-      <div>
-        <label style="display:flex; justify-content:space-between;">
-          <span>預計總量 (噸)</span>
-          <span style="font-size:0.75rem; color:#0052cc; cursor:pointer;" onclick="setTargetPrompt()">✎ 設定</span>
-        </label>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); align-items: start;">
+      <div class="form-col">
+        <div class="form-label-row"><label>客戶名稱</label></div>
+        <input type="text" id="customer" value="高雄市政府" oninput="onCustomerFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>工程名稱 / 地點</label></div>
+        <input type="text" id="project" value="苓雅區武慶三路" oninput="onProjectFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>品名 / 料別</label></div>
+        <input type="text" id="material" value="1/2密集配" oninput="onMaterialFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label>預計總量 (噸)</label>
+          <span style="font-size:0.75rem; color:#0052cc; cursor:pointer; font-weight:600;" onclick="setTargetPrompt()">✎ 設定</span>
+        </div>
         <input type="text" inputmode="decimal" id="projectTarget" placeholder="例如: 600" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onTargetInput(this.value)">
       </div>
-      <div>
-        <label style="display:flex; justify-content:space-between;">
-          <span style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</span>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</label>
           <span style="font-size:0.75rem; color:#718096;">可手key</span>
-        </label>
+        </div>
         <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
       </div>
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <label style="margin-bottom:0; color:#d69e2e; font-weight:700;">📞 等電話／車數</label>
-          <select id="waitPhoneQuickSelect" style="width:auto; padding:2px 6px; font-size:0.78rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
+      <div class="form-col">
+        <div class="form-label-row">
+          <label style="color:#d69e2e; font-weight:700;">📞 等電話／車數</label>
+          <select id="waitPhoneQuickSelect" style="width:auto; height:24px; padding:0 6px; font-size:0.76rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
             <option value="">-- 快選下拉 --</option>
             <option value="1台等電話">📞 1台等電話</option>
             <option value="2台等電話">📞 2台等電話</option>
@@ -291,26 +307,29 @@
       <button class="btn-secondary" style="font-size: 0.8rem; padding: 5px 12px; background: #ebf8ff; color: #0052cc; border: 1px solid #bee3f8;" onclick="openVehicleManager()">⚙️ 管理司機車牌名單</button>
     </div>
     <input type="hidden" id="editDispatchId" value="">
-    <div class="grid">
-      <div class="autocomplete-wrap">
-        <label>車牌 (輸入數字4碼快選)</label>
+    <div class="grid" style="align-items: start;">
+      <div class="form-col autocomplete-wrap">
+        <div class="form-label-row"><label>車牌 (輸入數字4碼快選)</label></div>
         <input type="text" id="plate" placeholder="例如輸入 0931 或 6663" autocomplete="off" oninput="onPlateInput(this.value)" onfocus="onPlateInput(this.value)" onclick="onPlateInput(this.value)">
         <div id="plateDropdown" class="autocomplete-list"></div>
       </div>
-      <div class="autocomplete-wrap">
-        <label>司機姓名 (點選名單或輸入)</label>
+      <div class="form-col autocomplete-wrap">
+        <div class="form-label-row"><label>司機姓名 (點選名單或輸入)</label></div>
         <input type="text" id="driver" placeholder="點擊看名單或輸入快選" autocomplete="off" oninput="onDriverInput(this.value)" onfocus="onDriverInput(this.value)" onclick="onDriverInput(this.value)">
         <div id="driverDropdown" class="autocomplete-list"></div>
       </div>
-      <div><label>實重 (KG)</label><input type="number" id="weight" placeholder="例如: 44080"></div>
-      <div>
-        <label>出場時間 (輸入數字如 1158)</label>
+      <div class="form-col">
+        <div class="form-label-row"><label>實重 (KG)</label></div>
+        <input type="number" id="weight" placeholder="例如: 44080">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>出場時間 (輸入數字如 1158)</label></div>
         <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
       </div>
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <label style="margin-bottom: 0;">隨車寄送／備註物品</label>
-          <select id="cargoQuickSelect" style="width: auto; padding: 2px 6px; font-size: 0.78rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
+      <div class="form-col">
+        <div class="form-label-row">
+          <label>隨車寄送／備註物品</label>
+          <select id="cargoQuickSelect" style="width: auto; height: 24px; padding: 0 6px; font-size: 0.76rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
             <option value="">-- 常用物品下拉選單 --</option>
             <option value="黏油1顆">🛢️ 黏油 1 顆</option>
             <option value="黏油2顆">🛢️ 黏油 2 顆</option>
