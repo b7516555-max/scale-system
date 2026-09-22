@@ -551,6 +551,16 @@
 
     function updateProjectCounts() {
       projectCounts.clear();
+
+      // 先將已設定/雲端建檔的工地納入 (即使尚未出車 count 為 0)
+      Object.keys(projectSettingsMap).forEach(pName => {
+        const clean = pName.trim();
+        if (clean && !projectCounts.has(clean)) {
+          projectCounts.set(clean, 0);
+        }
+      });
+
+      // 累計各工地出車車次
       dispatches.forEach(item => {
         const p = item.project ? item.project.trim() : '';
         if (p) {

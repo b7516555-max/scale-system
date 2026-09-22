@@ -243,7 +243,10 @@
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-bottom: 12px;">
       <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
-      <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="addNewProjectPrompt()">＋ 新增另一組工程地點</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="openProjectManager()">⚙️ 管理工地建檔</button>
+        <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="openProjectManager(true)">＋ 預先建檔工程</button>
+      </div>
     </div>
     <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); align-items: start;">
       <div class="form-col">
@@ -453,6 +456,75 @@
     </div>
   </div>
 
+  <!-- 工地與工程預先建檔管理彈窗 -->
+  <div class="modal-overlay" id="projectModalOverlay" onclick="closeProjectManagerIfOutside(event)">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3>🏗️ 工程／工地名單建檔與管理</h3>
+        <button class="modal-close-btn" onclick="closeProjectManager()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #f8fafc; padding: 14px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: 700; color: #2d3748; font-size: 0.95rem;" id="projectFormTitle">➕ 預先建檔新工程／工地</span>
+            <span style="font-size: 0.78rem; color: #718096;">建檔後會在頂端顯示頁籤，出車時點選立馬切換</span>
+          </div>
+          <input type="hidden" id="editProjectIndex" value="-1">
+          <input type="hidden" id="editProjectOldName" value="">
+          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; align-items: start;">
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">工程名稱 / 地點 <span style="color:#e53e3e;">*</span></label>
+              <input type="text" id="mgrProjectName" placeholder="例如: 苓雅區武慶三路" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">客戶名稱</label>
+              <input type="text" id="mgrProjectCustomer" placeholder="例如: 高雄市政府" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">品名 / 料別</label>
+              <input type="text" id="mgrProjectMaterial" placeholder="例如: 1/2密集配" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">預計總量 (噸)</label>
+              <input type="number" step="any" id="mgrProjectTarget" placeholder="例如: 500" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #d69e2e; margin-bottom: 3px; display: block;">📞 等電話／車數</label>
+              <input type="text" id="mgrProjectWaitPhone" placeholder="例如: 2台等電話" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button class="btn-secondary" style="padding: 6px 14px; display: none;" id="btnCancelProjectEdit" onclick="cancelProjectEdit()">取消修改</button>
+            <button class="btn-primary" style="padding: 6px 18px;" onclick="saveProjectItem()">💾 儲存建檔</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 700; color: #4a5568; font-size: 0.9rem;">現有工程名單 (<span id="mgrProjectCount">0</span> 個地點)</span>
+          <span style="font-size: 0.78rem; color: #718096;">可直接點「🚀 切換此工地」立馬開始出車過磅</span>
+        </div>
+
+        <div class="vehicle-table-wrap">
+          <table style="margin-top: 0;">
+            <thead>
+              <tr>
+                <th width="40">#</th>
+                <th>工程名稱 / 地點</th>
+                <th>客戶名稱</th>
+                <th>料別</th>
+                <th>需求噸數</th>
+                <th>等電話狀態</th>
+                <th width="70" style="text-align: center;">已出車數</th>
+                <th width="150" style="text-align: center;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="mgrProjectTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const DEFAULT_PRESET_VEHICLES = [
       { plate: "LAP-083", driver: "文造(大車管理)" }, { plate: "KLH-0723", driver: "豬哥晉" },
@@ -590,6 +662,235 @@
       presetVehicles.splice(idx, 1);
       savePresetVehicles();
       renderVehicleManagerTable();
+    }
+
+    // ==========================================
+    // 工程 / 工地預先建檔與名單管理邏輯
+    // ==========================================
+    const STORAGE_PROJECT_KEY = 'scale_preset_projects_v2';
+
+    function loadPresetProjects() {
+      try {
+        const saved = localStorage.getItem(STORAGE_PROJECT_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {
+        console.error("載入自訂工程名單錯誤:", e);
+      }
+      return [
+        { name: "苓雅區武慶三路", customer: "高雄市政府", material: "1/2密集配", target: 600, wait: "" }
+      ];
+    }
+
+    function savePresetProjects(list) {
+      localStorage.setItem(STORAGE_PROJECT_KEY, JSON.stringify(list || presetProjects));
+    }
+
+    let presetProjects = loadPresetProjects();
+
+    function openProjectManager(focusInput = false) {
+      document.getElementById("projectModalOverlay").style.display = "flex";
+      cancelProjectEdit();
+      renderProjectManagerTable();
+      if (focusInput) {
+        setTimeout(() => {
+          document.getElementById("mgrProjectName").focus();
+        }, 100);
+      }
+    }
+
+    function closeProjectManager() {
+      document.getElementById("projectModalOverlay").style.display = "none";
+    }
+
+    function closeProjectManagerIfOutside(e) {
+      if (e.target.id === "projectModalOverlay") {
+        closeProjectManager();
+      }
+    }
+
+    function renderProjectManagerTable() {
+      const tbody = document.getElementById("mgrProjectTableBody");
+      tbody.innerHTML = "";
+
+      // 匯總已出車數統計
+      const countsMap = new Map();
+      (currentRecords || []).forEach(r => {
+        if (r.plate === '__SET__') return;
+        const p = (r.project || "").trim();
+        if (p) countsMap.set(p, (countsMap.get(p) || 0) + 1);
+      });
+
+      document.getElementById("mgrProjectCount").textContent = presetProjects.length;
+
+      presetProjects.forEach((item, idx) => {
+        const pName = item.name || "";
+        const curCount = countsMap.get(pName) || 0;
+        const target = item.target || getProjectTarget(pName) || 0;
+        const wait = item.wait || getProjectWaitPhone(pName) || "";
+        const isActive = (activeProject === pName);
+
+        const tr = document.createElement("tr");
+        if (isActive) {
+          tr.style.backgroundColor = "#ebf8ff";
+        }
+
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>
+            <b style="color:#0052cc;">${pName}</b>
+            ${isActive ? '<span style="background:#0052cc; color:#fff; font-size:0.72rem; padding:1px 5px; border-radius:4px; margin-left:4px;">當前</span>' : ''}
+          </td>
+          <td>${item.customer || '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td>${item.material || '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td>${target > 0 ? `<b>${target}</b> 噸` : '<span style="color:#a0aec0;">-</span>'}</td>
+          <td>${wait ? `<span style="color:#d69e2e; font-weight:600;">📞 ${wait}</span>` : '<span style="color:#a0aec0;">-</span>'}</td>
+          <td style="text-align: center;"><span class="project-tab-count">${curCount} 車</span></td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="btn-primary" style="padding: 3px 8px; font-size: 0.78rem; margin-right: 4px;" onclick="selectProjectFromManager(${idx})">🚀 切換</button>
+            <button class="btn-edit-sm" onclick="startEditProject(${idx})">編輯</button>
+            <button class="btn-del-sm" onclick="deleteProjectItem(${idx})">刪除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function startEditProject(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      document.getElementById("editProjectIndex").value = idx;
+      document.getElementById("editProjectOldName").value = item.name;
+      document.getElementById("mgrProjectName").value = item.name;
+      document.getElementById("mgrProjectCustomer").value = item.customer || "";
+      document.getElementById("mgrProjectMaterial").value = item.material || "";
+      const t = item.target || getProjectTarget(item.name) || "";
+      document.getElementById("mgrProjectTarget").value = t > 0 ? t : "";
+      document.getElementById("mgrProjectWaitPhone").value = item.wait || getProjectWaitPhone(item.name) || "";
+      
+      document.getElementById("projectFormTitle").textContent = `✏️ 編輯工程／工地：${item.name}`;
+      document.getElementById("btnCancelProjectEdit").style.display = "inline-block";
+      document.getElementById("mgrProjectName").focus();
+    }
+
+    function cancelProjectEdit() {
+      document.getElementById("editProjectIndex").value = "-1";
+      document.getElementById("editProjectOldName").value = "";
+      document.getElementById("mgrProjectName").value = "";
+      document.getElementById("mgrProjectCustomer").value = document.getElementById("customer").value || "高雄市政府";
+      document.getElementById("mgrProjectMaterial").value = document.getElementById("material").value || "1/2密集配";
+      document.getElementById("mgrProjectTarget").value = "";
+      document.getElementById("mgrProjectWaitPhone").value = "";
+      document.getElementById("projectFormTitle").textContent = "➕ 預先建檔新工程／工地";
+      document.getElementById("btnCancelProjectEdit").style.display = "none";
+    }
+
+    function saveProjectItem() {
+      const name = document.getElementById("mgrProjectName").value.trim();
+      const customer = document.getElementById("mgrProjectCustomer").value.trim();
+      const material = document.getElementById("mgrProjectMaterial").value.trim();
+      const rawTarget = document.getElementById("mgrProjectTarget").value.trim();
+      const target = parseFloat(rawTarget) || 0;
+      const wait = document.getElementById("mgrProjectWaitPhone").value.trim();
+      const editIdx = parseInt(document.getElementById("editProjectIndex").value, 10);
+      const oldName = document.getElementById("editProjectOldName").value.trim();
+
+      if (!name) {
+        alert("請輸入工程名稱 / 地點！");
+        document.getElementById("mgrProjectName").focus();
+        return;
+      }
+
+      // 檢查是否與其他既有工程同名
+      const duplicateIdx = presetProjects.findIndex((p, i) => p.name === name && i !== editIdx);
+      if (duplicateIdx !== -1) {
+        alert(`工程名稱【${name}】已存在，請勿重複命名！`);
+        document.getElementById("mgrProjectName").focus();
+        return;
+      }
+
+      const projectData = { name, customer, material, target, wait };
+
+      if (editIdx >= 0 && editIdx < presetProjects.length) {
+        // 編輯既有工程
+        presetProjects[editIdx] = projectData;
+        if (oldName && oldName !== name) {
+          // 清除舊名稱的 localStorage 關聯
+          localStorage.removeItem('scale_customer_' + oldName);
+          localStorage.removeItem('scale_material_' + oldName);
+          localStorage.removeItem('scale_target_' + oldName);
+          localStorage.removeItem('scale_wait_phone_' + oldName);
+          if (activeProject === oldName) activeProject = name;
+        }
+      } else {
+        // 新增建檔 (排在最前面)
+        presetProjects.unshift(projectData);
+      }
+
+      // 存入 localStorage
+      savePresetProjects();
+
+      // 設定各別項目快取與目標噸數、等電話
+      if (customer) localStorage.setItem('scale_customer_' + name, customer);
+      if (material) localStorage.setItem('scale_material_' + name, material);
+      if (target > 0) {
+        localStorage.setItem('scale_target_' + name, target);
+      } else {
+        localStorage.removeItem('scale_target_' + name);
+      }
+      if (wait) {
+        localStorage.setItem('scale_wait_phone_' + name, wait);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + name);
+      }
+
+      // 同步設定到雲端 __SET__ 記錄
+      debouncedSyncProjectSettings(name);
+
+      // 更新 knownProjects
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+      cancelProjectEdit();
+
+      // 詢問或自動切換至剛建檔的工地以便立馬出車
+      switchProjectTab(name);
+      closeProjectManager();
+    }
+
+    function selectProjectFromManager(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      switchProjectTab(item.name);
+      closeProjectManager();
+    }
+
+    function deleteProjectItem(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      if (!confirm(`確定要將工程地點【${item.name}】從名單中移除嗎？\n(注意：已出車之歷史資料仍會保留)`)) return;
+      
+      const pName = item.name;
+      presetProjects.splice(idx, 1);
+      savePresetProjects();
+
+      // 清除本地儲存
+      localStorage.removeItem('scale_customer_' + pName);
+      localStorage.removeItem('scale_material_' + pName);
+      localStorage.removeItem('scale_target_' + pName);
+      localStorage.removeItem('scale_wait_phone_' + pName);
+
+      if (activeProject === pName) {
+        activeProject = "";
+        localStorage.removeItem('scale_active_project');
+      }
+
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+      renderTable();
     }
 
     function onPlateInput(val) {
@@ -732,7 +1033,17 @@
     function updateKnownProjects() {
       knownProjects.clear();
 
-      // 從已有歷史資料匯整出現過的所有個別工地地點（排除 __SET__ 設定記錄）
+      // 1. 先將預先建檔名單中的工程納入
+      presetProjects.forEach(item => {
+        const pName = (item.name || "").trim();
+        if (pName && !knownProjects.has(pName)) {
+          const cust = item.customer || localStorage.getItem('scale_customer_' + pName) || "";
+          const mat = item.material || localStorage.getItem('scale_material_' + pName) || "";
+          knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
+        }
+      });
+
+      // 2. 從已有歷史資料匯整出現過的所有個別工地地點（排除 __SET__ 設定記錄）
       currentRecords.forEach(r => {
         if (r.plate === '__SET__') return; // 略過設定記錄
         const pName = r.project ? r.project.trim() : "";
@@ -744,8 +1055,19 @@
         }
       });
 
+      // 3. 也檢查雲端 __SET__ 記錄中是否有設定過的案場
+      currentRecords.forEach(r => {
+        if (r.plate === '__SET__' && r.customer) {
+          const pName = r.customer.trim();
+          if (pName && !knownProjects.has(pName)) {
+            const cust = localStorage.getItem('scale_customer_' + pName) || "";
+            const mat = localStorage.getItem('scale_material_' + pName) || "";
+            knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
+          }
+        }
+      });
 
-      // 如果當前表單有設定工程，且尚未在清單中
+      // 4. 如果當前表單有設定工程，且尚未在清單中
       const formP = document.getElementById("project").value.trim();
       const formC = document.getElementById("customer").value.trim();
       const formM = document.getElementById("material").value.trim();
@@ -1204,23 +1526,41 @@
     async function loadRecords() {
       try {
         currentRecords = await window.ScaleApi.fetchDispatches();
-        // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage
+        // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage 與預先建檔清單
         currentRecords.filter(r => r.plate === '__SET__').forEach(r => {
           try {
             const cfg = JSON.parse(r.material || '{}');
-            const pName = r.customer;
+            const pName = (r.customer || '').trim();
             if (pName) {
               // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
-              if (pendingSyncProjects.has(pName)) return;
-              if (cfg.target > 0) {
-                localStorage.setItem('scale_target_' + pName, cfg.target);
-              } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
-                // 如果本機本來就沒有或為0，保持乾淨
+              if (!pendingSyncProjects.has(pName)) {
+                if (cfg.target > 0) {
+                  localStorage.setItem('scale_target_' + pName, cfg.target);
+                } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
+                  // 保持乾淨
+                }
+                if (cfg.wait) {
+                  localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+                } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
+                  localStorage.removeItem('scale_wait_phone_' + pName);
+                }
               }
-              if (cfg.wait) {
-                localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-              } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
-                localStorage.removeItem('scale_wait_phone_' + pName);
+
+              // 同步至 presetProjects 名單 (讓另一台裝置或手機/電腦也能同步看到該建檔工地)
+              let found = presetProjects.find(p => p.name === pName);
+              if (!found) {
+                found = {
+                  name: pName,
+                  customer: localStorage.getItem('scale_customer_' + pName) || "",
+                  material: localStorage.getItem('scale_material_' + pName) || "",
+                  target: cfg.target || 0,
+                  wait: cfg.wait || ""
+                };
+                presetProjects.push(found);
+                savePresetProjects();
+              } else {
+                if (cfg.target > 0) found.target = cfg.target;
+                if (cfg.wait) found.wait = cfg.wait;
               }
             }
           } catch(e) {}
