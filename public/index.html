@@ -274,8 +274,10 @@
       </div>
       <div class="form-col">
         <div class="form-label-row">
-          <label style="color:#d69e2e; font-weight:700;">📞 等電話／車數</label>
-          <select id="waitPhoneQuickSelect" style="width:auto; height:24px; padding:0 6px; font-size:0.76rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
+          <label style="color:#d69e2e; font-weight:700; white-space:nowrap;">📞 等電話／車數</label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select id="waitPhoneQuickSelect" style="width:100%; height:32px; padding:2px 8px; font-size:0.82rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
             <option value="">-- 快選下拉 --</option>
             <option value="1台等電話">📞 1台等電話</option>
             <option value="2台等電話">📞 2台等電話</option>
@@ -284,8 +286,8 @@
             <option value="正常出車">✅ 正常出車</option>
             <option value="CLEAR">✕ 清除</option>
           </select>
+          <input type="text" id="projectWaitPhoneInput" placeholder="可選上方快選或手動輸入" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
         </div>
-        <input type="text" id="projectWaitPhoneInput" placeholder="可選上方快選或手動輸入" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
       </div>
     </div>
     <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
@@ -328,8 +330,10 @@
       </div>
       <div class="form-col">
         <div class="form-label-row">
-          <label>隨車寄送／備註物品</label>
-          <select id="cargoQuickSelect" style="width: auto; height: 24px; padding: 0 6px; font-size: 0.76rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
+          <label style="white-space:nowrap;">隨車寄送／備註物品</label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select id="cargoQuickSelect" style="width: 100%; height: 32px; padding: 2px 8px; font-size: 0.82rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
             <option value="">-- 常用物品下拉選單 --</option>
             <option value="黏油1顆">🛢️ 黏油 1 顆</option>
             <option value="黏油2顆">🛢️ 黏油 2 顆</option>
@@ -343,8 +347,8 @@
             <option value="手套">🧤 手套</option>
             <option value="工具">🔧 工具</option>
           </select>
+          <input type="text" id="cargo_notes" placeholder="可直接手寫或點選下方快捷 (如: 黏油1顆)" autocomplete="off">
         </div>
-        <input type="text" id="cargo_notes" placeholder="可直接手寫或點選上方/下方快選 (如: 黏油1顆)" autocomplete="off">
         <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
           <button type="button" class="quick-item-btn" onclick="addCargoTag('黏油1顆')">＋黏油1顆</button>
           <button type="button" class="quick-item-btn" onclick="addCargoTag('小便當1個')">＋小便當1個</button>
