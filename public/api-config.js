@@ -67,6 +67,25 @@
     }
     const result = await res.json();
     const list = result.data || [];
+
+    // 檢查是否有雲端工程全域設定記錄 (__PROJECT_CONFIG__)，自動同步已被移除/封存的工地名單
+    try {
+      const cfgRow = list.find(r => r.plate === '__SET__' && r.customer === '__PROJECT_CONFIG__');
+      if (cfgRow && cfgRow.material) {
+        const parsed = typeof cfgRow.material === 'string' ? JSON.parse(cfgRow.material || '{}') : (cfgRow.material || {});
+        if (parsed && Array.isArray(parsed.removed)) {
+          const cloudTime = Number(parsed.updatedAt) || 0;
+          const localTime = Number(localStorage.getItem('scale_removed_projects_updated_at')) || 0;
+          if (cloudTime >= localTime) {
+            localStorage.setItem(STORAGE_REMOVED_PROJECTS_KEY, JSON.stringify(parsed.removed));
+            localStorage.setItem('scale_removed_projects_updated_at', String(cloudTime));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('解析雲端工程設定失敗:', e);
+    }
+
     // 清理資料格式，轉型字串避免如數字 driver 或特殊物件導致 includes 崩潰
     return list.map(item => ({
       ...item,
@@ -126,6 +145,60 @@
     return result;
   }
 
+  // 雲端同步已移除/封存工程管理邏輯
+  const STORAGE_REMOVED_PROJECTS_KEY = 'scale_removed_projects_v1';
+
+  function getRemovedProjects() {
+    try {
+      const saved = localStorage.getItem(STORAGE_REMOVED_PROJECTS_KEY);
+      if (saved) return new Set(JSON.parse(saved));
+    } catch (e) {}
+    return new Set();
+  }
+
+  function saveRemovedProjects(set, syncToCloud = true) {
+    const arr = Array.from(set || []);
+    const now = Date.now();
+    try {
+      localStorage.setItem(STORAGE_REMOVED_PROJECTS_KEY, JSON.stringify(arr));
+      localStorage.setItem('scale_removed_projects_updated_at', String(now));
+    } catch (e) {}
+    if (syncToCloud) {
+      syncRemovedProjectsToCloud(arr, now).catch(e => console.warn('同步移除工程名單至雲端失敗:', e));
+    }
+  }
+
+  async function syncRemovedProjectsToCloud(removedArray, updatedAt) {
+    const arr = Array.isArray(removedArray) ? removedArray : Array.from(removedArray || []);
+    const now = updatedAt || Date.now();
+    const payload = {
+      customer: '__PROJECT_CONFIG__',
+      project: '__SETTINGS__',
+      material: JSON.stringify({ removed: arr, updatedAt: now }),
+      driver: '-',
+      plate: '__SET__',
+      weight: 1,
+      exit_time: '-'
+    };
+    try {
+      const list = await fetchDispatches();
+      const existing = list.find(r => r.plate === '__SET__' && r.customer === '__PROJECT_CONFIG__');
+      if (existing && existing.id) {
+        payload.id = existing.id;
+        try {
+          await postAction('updateDispatch', payload);
+        } catch (ue) {
+          await postAction('deleteDispatch', { id: existing.id });
+          await postAction('addDispatch', payload);
+        }
+      } else {
+        await postAction('addDispatch', payload);
+      }
+    } catch (err) {
+      console.warn('syncRemovedProjectsToCloud 失敗:', err);
+    }
+  }
+
   // 讀取所有工程設定 (手機端呼叫，讀取 Google Sheets 中的目標噸數與等電話車數)
   async function fetchProjectSettings() {
     const baseUrl = getApiBaseUrl();
@@ -156,6 +229,9 @@
     fetchDispatches: fetchDispatches,
     postAction: postAction,
     fetchProjectSettings: fetchProjectSettings,
-    saveProjectSettings: saveProjectSettings
+    saveProjectSettings: saveProjectSettings,
+    getRemovedProjects: getRemovedProjects,
+    saveRemovedProjects: saveRemovedProjects,
+    syncRemovedProjectsToCloud: syncRemovedProjectsToCloud
   };
 })();

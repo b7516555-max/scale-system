@@ -477,19 +477,22 @@
       try {
         const freshData = await window.ScaleApi.fetchDispatches();
 
-        // 從 __SET__ 特殊記錄中讀取工程設定（目標噸數、等電話車數）
+        // 從 __SET__ 特殊記錄中讀取工程設定（目標噸數、等電話車數、客戶、料別）
         freshData.filter(r => r.plate === '__SET__').forEach(r => {
           try {
-            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
             const pName = (r.customer || '').trim();
-            if (pName) {
-              projectSettingsMap[pName] = {
-                target: Number(cfg.target) || 0,
-                wait: String(cfg.wait || '').trim()
-              };
-              if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
-              if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-            }
+            if (!pName || pName === '__PROJECT_CONFIG__') return;
+            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            projectSettingsMap[pName] = {
+              target: Number(cfg.target) || 0,
+              wait: String(cfg.wait || '').trim(),
+              customer: cfg.customer || '',
+              material: cfg.material || ''
+            };
+            if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
+            if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+            if (cfg.customer) localStorage.setItem('scale_customer_' + pName, cfg.customer);
+            if (cfg.material) localStorage.setItem('scale_material_' + pName, cfg.material);
           } catch(e) {
             console.warn('解析設定失敗:', e);
           }
@@ -551,27 +554,28 @@
 
     function updateProjectCounts() {
       projectCounts.clear();
+      const removedProjects = window.ScaleApi ? window.ScaleApi.getRemovedProjects() : new Set();
 
-      // 先將已設定/雲端建檔的工地納入 (即使尚未出車 count 為 0)
+      // 先將已設定/雲端建檔的工地納入 (即使尚未出車 count 為 0，排除已被移除之工地)
       Object.keys(projectSettingsMap).forEach(pName => {
         const clean = pName.trim();
-        if (clean && !projectCounts.has(clean)) {
+        if (clean && clean !== '__PROJECT_CONFIG__' && !removedProjects.has(clean) && !projectCounts.has(clean)) {
           projectCounts.set(clean, 0);
         }
       });
 
-      // 累計各工地出車車次
+      // 累計各工地出車車次 (排除已被移除之工地)
       dispatches.forEach(item => {
         const p = item.project ? item.project.trim() : '';
-        if (p) {
+        if (p && !removedProjects.has(p)) {
           projectCounts.set(p, (projectCounts.get(p) || 0) + 1);
         }
       });
 
-      // 若未指定或不存在，自動預設為第一個個別工地
-      if (!activeProject || !projectCounts.has(activeProject)) {
+      // 若未指定或已被移除或不存在於 projectCounts，自動預設為第一個個別工地
+      if (!activeProject || removedProjects.has(activeProject) || !projectCounts.has(activeProject)) {
         const firstP = projectCounts.keys().next().value;
-        if (firstP) activeProject = firstP;
+        activeProject = firstP || '';
       }
     }
 
@@ -612,14 +616,27 @@
         ? dispatches.filter(item => item.project === activeProject)
         : dispatches;
 
+      const meta = projectSettingsMap[activeProject] || {};
+
       if (filtered.length > 0) {
-        document.getElementById('infoCustomer').textContent = filtered[0].customer || '-';
+        document.getElementById('infoCustomer').textContent = filtered[0].customer || meta.customer || '-';
         document.getElementById('infoProject').textContent = activeProject || '-';
-        document.getElementById('infoMaterial').textContent = filtered[0].material || '-';
+        document.getElementById('infoMaterial').textContent = filtered[0].material || meta.material || '-';
         document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
       } else {
+        document.getElementById('infoCustomer').textContent = meta.customer || localStorage.getItem('scale_customer_' + activeProject) || '-';
         document.getElementById('infoProject').textContent = activeProject || '-';
+        document.getElementById('infoMaterial').textContent = meta.material || localStorage.getItem('scale_material_' + activeProject) || '-';
         document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
+        if (activeProject) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:35px 20px; color:#718096; background:#fff; border-radius:12px; margin-top:12px; border:1px dashed #cbd5e0;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">🚚</div>
+              <div style="font-size:1rem; font-weight:600; color:#4a5568;">【${activeProject}】目前尚無出車過磅記錄</div>
+              <small style="color:#a0aec0; margin-top:6px; display:inline-block;">車輛過磅出場後將自動即時顯示於此</small>
+            </div>
+          `;
+        }
       }
 
       filtered.forEach((item, index) => {

@@ -521,6 +521,10 @@
             <tbody id="mgrProjectTableBody"></tbody>
           </table>
         </div>
+        <div id="mgrRemovedContainer" style="display:none; margin-top:15px; padding-top:12px; border-top:1px dashed #cbd5e0;">
+          <div style="font-size:0.85rem; font-weight:600; color:#718096; margin-bottom:6px;">📦 已封存／已移除的工程地點（點「恢復」即可重新加入頂部頁籤）：</div>
+          <div id="mgrRemovedList" style="display:flex; flex-wrap:wrap;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -671,6 +675,9 @@
     const STORAGE_REMOVED_PROJECTS_KEY = 'scale_removed_projects_v1';
 
     function getRemovedProjects() {
+      if (window.ScaleApi && window.ScaleApi.getRemovedProjects) {
+        return window.ScaleApi.getRemovedProjects();
+      }
       try {
         const saved = localStorage.getItem(STORAGE_REMOVED_PROJECTS_KEY);
         if (saved) return new Set(JSON.parse(saved));
@@ -678,7 +685,10 @@
       return new Set();
     }
 
-    function saveRemovedProjects(set) {
+    function saveRemovedProjects(set, syncToCloud = true) {
+      if (window.ScaleApi && window.ScaleApi.saveRemovedProjects) {
+        return window.ScaleApi.saveRemovedProjects(set, syncToCloud);
+      }
       localStorage.setItem(STORAGE_REMOVED_PROJECTS_KEY, JSON.stringify(Array.from(set)));
     }
 
@@ -687,14 +697,12 @@
         const saved = localStorage.getItem(STORAGE_PROJECT_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
       } catch (e) {
         console.error("載入自訂工程名單錯誤:", e);
       }
-      return [
-        { name: "苓雅區武慶三路", customer: "高雄市政府", material: "1/2密集配", target: 600, wait: "" }
-      ];
+      return [];
     }
 
     function savePresetProjects(list) {
@@ -769,6 +777,49 @@
         `;
         tbody.appendChild(tr);
       });
+
+      // 顯示已被封存/移除的工地名單，供使用者一鍵恢復
+      const removedProjects = getRemovedProjects();
+      const removedContainer = document.getElementById("mgrRemovedContainer");
+      if (removedContainer) {
+        if (removedProjects.size > 0) {
+          removedContainer.style.display = "block";
+          const listEl = document.getElementById("mgrRemovedList");
+          listEl.innerHTML = "";
+          removedProjects.forEach(pName => {
+            const tag = document.createElement("span");
+            tag.style = "display:inline-flex; align-items:center; background:#edf2f7; border:1px solid #cbd5e0; padding:2px 8px; border-radius:6px; margin:4px 6px 4px 0; font-size:0.8rem; color:#4a5568;";
+            tag.innerHTML = `<span>🗑️ ${pName}</span><button type="button" style="margin-left:6px; background:none; border:none; color:#2b6cb0; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="恢復此工地">↩️ 恢復</button>`;
+            tag.querySelector("button").onclick = () => restoreRemovedProject(pName);
+            listEl.appendChild(tag);
+          });
+        } else {
+          removedContainer.style.display = "none";
+        }
+      }
+    }
+
+    function restoreRemovedProject(pName) {
+      if (!pName) return;
+      const removedProjects = getRemovedProjects();
+      removedProjects.delete(pName);
+      saveRemovedProjects(removedProjects, true);
+      // 若尚未在 presetProjects 中，加回
+      if (!presetProjects.some(p => p.name === pName)) {
+        presetProjects.push({
+          name: pName,
+          customer: localStorage.getItem('scale_customer_' + pName) || "",
+          material: localStorage.getItem('scale_material_' + pName) || "",
+          target: getProjectTarget(pName) || 0,
+          wait: getProjectWaitPhone(pName) || ""
+        });
+        savePresetProjects();
+      }
+      debouncedSyncProjectSettings(pName);
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+      renderTable();
     }
 
     function startEditProject(idx) {
@@ -844,7 +895,18 @@
 
             // 更新記憶體中 currentRecords 的歷史過磅資料工地名稱
             (currentRecords || []).forEach(r => {
-              if (r.project === oldName) r.project = name;
+              if (r.project === oldName) {
+                r.project = name;
+                // 同步將雲端歷史紀錄更新為新工程名稱
+                if (window.ScaleApi && r.plate !== '__SET__') {
+                  window.ScaleApi.postAction('updateDispatch', { ...r, project: name }).catch(async (e) => {
+                    try {
+                      await window.ScaleApi.postAction('deleteDispatch', { id: r.id });
+                      await window.ScaleApi.postAction('addDispatch', { ...r, project: name });
+                    } catch (err2) {}
+                  });
+                }
+              }
             });
 
             // 處理舊名稱對應的 __SET__ 雲端設定紀錄 (改名或刪除舊設定)
@@ -856,7 +918,7 @@
                   id: r.id,
                   customer: name,
                   project: '__SETTINGS__',
-                  material: JSON.stringify({ target, wait }),
+                  material: JSON.stringify({ target, wait, customer, material }),
                   driver: '-',
                   plate: '__SET__',
                   weight: 1,
@@ -865,20 +927,20 @@
               }
             });
 
-            // 標記舊名稱已移除，避免 loadRecords() 再次把舊名稱起死回生
+            // 標記舊名稱已移除，並同步雲端避免手機/唯讀版顯示舊名稱
             const removedProjects = getRemovedProjects();
             removedProjects.add(oldName);
-            saveRemovedProjects(removedProjects);
+            saveRemovedProjects(removedProjects, true);
 
             if (activeProject === oldName) activeProject = name;
           }
         } else {
           // 新增建檔 (排在最前面)
           presetProjects.unshift(projectData);
-          // 若之前曾被刪除過，重新加入
+          // 若之前曾被刪除過，重新加入並同步至雲端
           const removedProjects = getRemovedProjects();
           removedProjects.delete(name);
-          saveRemovedProjects(removedProjects);
+          saveRemovedProjects(removedProjects, true);
         }
 
         // 存入 localStorage
@@ -946,10 +1008,10 @@
       presetProjects.splice(idx, 1);
       savePresetProjects();
 
-      // 標記已從清單中移除，避免 loadRecords() 雲端同步時又自動加回來
+      // 標記已從清單中移除，並同步雲端讓手機/唯讀版也同步移除
       const removedProjects = getRemovedProjects();
       removedProjects.add(pName);
-      saveRemovedProjects(removedProjects);
+      saveRemovedProjects(removedProjects, true);
 
       // 清除本地儲存
       localStorage.removeItem('scale_customer_' + pName);
@@ -1162,7 +1224,7 @@
       currentRecords.forEach(r => {
         if (r.plate === '__SET__' && r.customer) {
           const pName = r.customer.trim();
-          if (pName && !removedProjects.has(pName) && !knownProjects.has(pName)) {
+          if (pName && pName !== '__PROJECT_CONFIG__' && !removedProjects.has(pName) && !knownProjects.has(pName)) {
             const cust = localStorage.getItem('scale_customer_' + pName) || "";
             const mat = localStorage.getItem('scale_material_' + pName) || "";
             knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
@@ -1170,11 +1232,11 @@
         }
       });
 
-      // 4. 如果當前表單有設定工程，且尚未在清單中
+      // 4. 如果當前表單有設定工程，且尚未在清單中 (且未被標記移除)
       const formP = document.getElementById("project").value.trim();
       const formC = document.getElementById("customer").value.trim();
       const formM = document.getElementById("material").value.trim();
-      if (formP && !knownProjects.has(formP)) {
+      if (formP && !removedProjects.has(formP) && !knownProjects.has(formP)) {
         knownProjects.set(formP, { customer: formC, material: formM, count: 0 });
       }
 
@@ -1297,12 +1359,15 @@
       }
     }
 
-    // 同步工程設定（目標噸數 + 等電話車數）至 Google Sheets 的特殊記錄，讓手機端也能讀取
+    // 同步工程設定（目標噸數 + 等電話車數 + 客戶 + 料別）至 Google Sheets 的特殊記錄，讓手機端也能讀取
     async function syncProjectSettingsToCloud(pName) {
-      if (!pName || !window.ScaleApi) return;
+      if (!pName || !window.ScaleApi || pName === '__PROJECT_CONFIG__') return;
       const target = getProjectTarget(pName) || 0;
       const waitPhone = getProjectWaitPhone(pName) || '';
-      const settingJson = JSON.stringify({ target, wait: waitPhone });
+      const meta = knownProjects.get(pName) || {};
+      const cust = localStorage.getItem('scale_customer_' + pName) || meta.customer || '';
+      const mat = localStorage.getItem('scale_material_' + pName) || meta.material || '';
+      const settingJson = JSON.stringify({ target, wait: waitPhone, customer: cust, material: mat });
       try {
         const existingList = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
         const existing = existingList[0];
@@ -1634,43 +1699,48 @@
         // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage 與預先建檔清單
         currentRecords.filter(r => r.plate === '__SET__').forEach(r => {
           try {
-            const cfg = JSON.parse(r.material || '{}');
             const pName = (r.customer || '').trim();
-            if (pName) {
-              if (removedProjects.has(pName)) {
-                // 若此工程先前已在管理面板被移除或改名，則忽略該過時設定
-                return;
-              }
-              // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
-              if (!pendingSyncProjects.has(pName)) {
-                if (cfg.target > 0) {
-                  localStorage.setItem('scale_target_' + pName, cfg.target);
-                } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
-                  // 保持乾淨
-                }
-                if (cfg.wait) {
-                  localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-                } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
-                  localStorage.removeItem('scale_wait_phone_' + pName);
-                }
-              }
+            if (!pName || pName === '__PROJECT_CONFIG__') return;
+            if (removedProjects.has(pName)) {
+              // 若此工程先前已被移除或改名，則忽略該過時設定
+              return;
+            }
+            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            
+            if (cfg.customer) localStorage.setItem('scale_customer_' + pName, cfg.customer);
+            if (cfg.material) localStorage.setItem('scale_material_' + pName, cfg.material);
 
-              // 同步至 presetProjects 名單 (讓另一台裝置或手機/電腦也能同步看到該建檔工地)
-              let found = presetProjects.find(p => p.name === pName);
-              if (!found) {
-                found = {
-                  name: pName,
-                  customer: localStorage.getItem('scale_customer_' + pName) || "",
-                  material: localStorage.getItem('scale_material_' + pName) || "",
-                  target: cfg.target || 0,
-                  wait: cfg.wait || ""
-                };
-                presetProjects.push(found);
-                savePresetProjects();
-              } else {
-                if (cfg.target > 0) found.target = cfg.target;
-                if (cfg.wait) found.wait = cfg.wait;
+            // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
+            if (!pendingSyncProjects.has(pName)) {
+              if (cfg.target > 0) {
+                localStorage.setItem('scale_target_' + pName, cfg.target);
+              } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
+                // 保持乾淨
               }
+              if (cfg.wait) {
+                localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+              } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
+                localStorage.removeItem('scale_wait_phone_' + pName);
+              }
+            }
+
+            // 同步至 presetProjects 名單 (讓另一台裝置或手機/電腦也能同步看到該建檔工地)
+            let found = presetProjects.find(p => p.name === pName);
+            if (!found) {
+              found = {
+                name: pName,
+                customer: cfg.customer || localStorage.getItem('scale_customer_' + pName) || "",
+                material: cfg.material || localStorage.getItem('scale_material_' + pName) || "",
+                target: cfg.target || 0,
+                wait: cfg.wait || ""
+              };
+              presetProjects.push(found);
+              savePresetProjects();
+            } else {
+              if (cfg.target > 0) found.target = cfg.target;
+              if (cfg.wait) found.wait = cfg.wait;
+              if (cfg.customer && !found.customer) found.customer = cfg.customer;
+              if (cfg.material && !found.material) found.material = cfg.material;
             }
           } catch(e) {}
         });
@@ -1690,6 +1760,16 @@
                 wait: getProjectWaitPhone(pName) || ""
               });
               savePresetProjects();
+            }
+          }
+        });
+
+        // 確保本地非移除的 presetProjects 都有同步至雲端 __SET__ 記錄，供 view.html 顯示
+        presetProjects.forEach(p => {
+          if (p.name && !removedProjects.has(p.name)) {
+            const hasCloudSet = currentRecords.some(r => r.plate === '__SET__' && r.customer === p.name);
+            if (!hasCloudSet) {
+              debouncedSyncProjectSettings(p.name);
             }
           }
         });
@@ -1886,6 +1966,12 @@
       const originalRecords = [...currentRecords];
 
       // 樂觀更新 (Optimistic UI)：0 秒立即反應在表格、累計與需求統計上，不必等待 GAS
+      const curProject = payload.project;
+      const removedProjects = getRemovedProjects();
+      if (removedProjects.has(curProject)) {
+        removedProjects.delete(curProject);
+        saveRemovedProjects(removedProjects, true);
+      }
       if (isEditing) {
         const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(editingDispatchId));
         if (targetIdx !== -1) {
