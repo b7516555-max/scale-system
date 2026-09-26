@@ -428,15 +428,27 @@
               <input type="text" id="mgrDriver" placeholder="請輸入司機姓名">
             </div>
             <div>
-              <button class="btn-primary" style="padding: 8px 16px;" onclick="saveVehicleItem()">儲存</button>
+              <button class="btn-primary" style="padding: 8px 16px;" id="btnSaveVehicle" onclick="saveVehicleItem()">儲存</button>
               <button class="btn-secondary" style="padding: 8px 12px; display: none;" id="btnCancelEdit" onclick="cancelVehicleEdit()">取消</button>
             </div>
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-weight: 700; color: #4a5568; font-size: 0.9rem;">現有名單 (<span id="mgrVehicleCount">0</span> 筆)</span>
-          <span style="font-size: 0.78rem; color: #718096;">修改後會自動儲存並同步至快選清單</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 700; color: #4a5568; font-size: 0.9rem;">現有名單 (<span id="mgrVehicleCount">0</span> 筆)</span>
+          </div>
+          <div style="position: relative; flex: 1; max-width: 280px; min-width: 190px;">
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #a0aec0; pointer-events: none; font-size: 0.85rem;">🔍</span>
+            <input type="text" id="mgrVehicleSearch" placeholder="搜尋車牌 (如 0723) 或司機..." 
+                   oninput="onVehicleSearchInput(this.value)"
+                   onkeydown="if(event.key==='Escape'){clearVehicleSearch();}"
+                   style="width: 100%; padding: 6px 28px 6px 30px; font-size: 0.85rem; border: 1.5px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; outline: none; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='#0052cc'" onblur="this.style.borderColor='#cbd5e0'">
+            <button type="button" onclick="clearVehicleSearch()" id="btnVehicleSearchClear" 
+                    title="清除搜尋"
+                    style="display: none; position: absolute; right: 7px; top: 50%; transform: translateY(-50%); background: #e2e8f0; border: none; color: #4a5568; cursor: pointer; font-size: 0.75rem; width: 18px; height: 18px; border-radius: 50%; padding: 0; line-height: 18px; text-align: center;">✕</button>
+          </div>
         </div>
 
         <div class="vehicle-table-wrap">
@@ -581,11 +593,67 @@
 
     let presetVehicles = loadPresetVehicles();
 
+    let vehicleSearchKeyword = "";
+
+    function onVehicleSearchInput(val) {
+      vehicleSearchKeyword = (val || "").trim();
+      const clearBtn = document.getElementById("btnVehicleSearchClear");
+      if (clearBtn) {
+        clearBtn.style.display = vehicleSearchKeyword ? "block" : "none";
+      }
+      renderVehicleManagerTable();
+    }
+
+    function clearVehicleSearch() {
+      vehicleSearchKeyword = "";
+      const input = document.getElementById("mgrVehicleSearch");
+      if (input) {
+        input.value = "";
+        input.focus();
+      }
+      const clearBtn = document.getElementById("btnVehicleSearchClear");
+      if (clearBtn) clearBtn.style.display = "none";
+      renderVehicleManagerTable();
+    }
+
+    function highlightVehicleMatch(text, query) {
+      if (!text || !query) return text || '';
+      const str = String(text);
+      const cleanQ = query.trim();
+      if (!cleanQ) return str;
+      const lowerStr = str.toLowerCase();
+      const lowerQ = cleanQ.toLowerCase();
+      const idx = lowerStr.indexOf(lowerQ);
+      if (idx !== -1) {
+        const before = str.slice(0, idx);
+        const match = str.slice(idx, idx + lowerQ.length);
+        const after = str.slice(idx + lowerQ.length);
+        return `${before}<mark style="background:#fefcbf; color:#744210; padding:1px 3px; border-radius:2px; font-weight:bold;">${match}</mark>${after}`;
+      }
+      // 支援純數字部分匹配 (例如輸入 0723 匹配 KLH-0723)
+      const digitsQ = cleanQ.replace(/[^0-9]/g, '');
+      if (digitsQ && digitsQ.length >= 2) {
+        const numIdx = str.indexOf(digitsQ);
+        if (numIdx !== -1) {
+          const before = str.slice(0, numIdx);
+          const match = str.slice(numIdx, numIdx + digitsQ.length);
+          const after = str.slice(numIdx + digitsQ.length);
+          return `${before}<mark style="background:#fefcbf; color:#744210; padding:1px 3px; border-radius:2px; font-weight:bold;">${match}</mark>${after}`;
+        }
+      }
+      return str;
+    }
+
     // 司機名單管理彈窗邏輯
     function openVehicleManager() {
       document.getElementById("vehicleModalOverlay").style.display = "flex";
       cancelVehicleEdit();
+      clearVehicleSearch();
       renderVehicleManagerTable();
+      setTimeout(() => {
+        const sInput = document.getElementById("mgrVehicleSearch");
+        if (sInput) sInput.focus();
+      }, 100);
     }
 
     function closeVehicleManager() {
@@ -600,21 +668,49 @@
 
     function renderVehicleManagerTable() {
       const tbody = document.getElementById("mgrVehicleTableBody");
-      document.getElementById("mgrVehicleCount").textContent = presetVehicles.length;
       tbody.innerHTML = "";
+
+      const query = (vehicleSearchKeyword || "").trim().toLowerCase();
+      let matchCount = 0;
+
       presetVehicles.forEach((item, idx) => {
+        const plate = (item.plate || "").toLowerCase();
+        const driver = (item.driver || "").toLowerCase();
+        if (query) {
+          const isPlateMatch = plate.includes(query) || plate.replace(/[^a-z0-9]/g, '').includes(query.replace(/[^a-z0-9]/g, ''));
+          const isDriverMatch = driver.includes(query);
+          if (!isPlateMatch && !isDriverMatch) return;
+        }
+
+        matchCount++;
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${idx + 1}</td>
-          <td><b>${item.plate}</b></td>
-          <td>${item.driver || '<span style="color:#a0aec0;">(未設定)</span>'}</td>
-          <td style="text-align: center;">
+          <td><b>${highlightVehicleMatch(item.plate, vehicleSearchKeyword)}</b></td>
+          <td>${item.driver ? highlightVehicleMatch(item.driver, vehicleSearchKeyword) : '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td style="text-align: center; white-space: nowrap;">
             <button class="btn-edit-sm" onclick="startEditVehicle(${idx})">編輯</button>
             <button class="btn-del-sm" onclick="deleteVehicleItem(${idx})">刪除</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
+
+      const countEl = document.getElementById("mgrVehicleCount");
+      if (countEl) {
+        countEl.textContent = query ? `${matchCount} / ${presetVehicles.length}` : presetVehicles.length;
+      }
+
+      if (matchCount === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td colspan="4" style="text-align: center; padding: 25px 10px; color: #a0aec0;">
+            🔍 找不到符合「<b>${vehicleSearchKeyword}</b>」的司機或車牌<br>
+            <button type="button" class="btn-secondary" style="margin-top: 8px; font-size: 0.8rem; padding: 4px 12px;" onclick="clearVehicleSearch()">清除搜尋</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
     }
 
     function startEditVehicle(idx) {
@@ -623,9 +719,13 @@
       document.getElementById("editVehicleIndex").value = idx;
       document.getElementById("mgrPlate").value = item.plate;
       document.getElementById("mgrDriver").value = item.driver || "";
-      document.getElementById("vehicleFormTitle").textContent = `✏️ 編輯第 ${idx + 1} 筆：${item.plate}`;
+      document.getElementById("vehicleFormTitle").textContent = `✏️ 編輯車牌：${item.plate}`;
       document.getElementById("btnCancelEdit").style.display = "inline-block";
-      document.getElementById("mgrPlate").focus();
+      const saveBtn = document.getElementById("btnSaveVehicle");
+      if (saveBtn) saveBtn.textContent = "💾 儲存修改";
+      // 自動聚焦司機姓名欄位，方便立即調整
+      document.getElementById("mgrDriver").focus();
+      document.getElementById("mgrDriver").select();
     }
 
     function cancelVehicleEdit() {
@@ -634,6 +734,8 @@
       document.getElementById("mgrDriver").value = "";
       document.getElementById("vehicleFormTitle").textContent = "➕ 新增司機／車牌";
       document.getElementById("btnCancelEdit").style.display = "none";
+      const saveBtn = document.getElementById("btnSaveVehicle");
+      if (saveBtn) saveBtn.textContent = "儲存";
     }
 
     function saveVehicleItem() {
