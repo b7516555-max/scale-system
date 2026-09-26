@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>出貨車次查詢 (唯讀加總版)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0; padding: 12px 12px 130px 12px; background: #f0f2f5; color: #1a202c;
+    }
+    .header-card { background: #ffffff; padding: 14px 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 12px; }
+    .header-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header-card h1 { margin: 0; font-size: 1.15rem; color: #1a365d; }
+    .badge-readonly { background: #edf2f7; color: #4a5568; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+    .info-line { font-size: 0.88rem; color: #4a5568; line-height: 1.5; }
+    .info-line b { color: #2d3748; }
+    .tool-panel { background: #ffffff; padding: 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 14px; }
+    .tool-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.9rem; }
+    .tool-row input { padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.95rem; }
+    .range-num { width: 55px; text-align: center; }
+    .search-input { flex: 1; }
+    .btn-group { display: flex; gap: 6px; }
+    .btn { flex: 1; padding: 8px 0; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .btn-apply { background: #0052cc; color: #fff; }
+    .btn-neutral { background: #edf2f7; color: #4a5568; }
+    .truck-card {
+      background: #ffffff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 2px solid transparent; display: flex;
+      align-items: center; gap: 12px; user-select: none; -webkit-tap-highlight-color: transparent; transition: all 0.15s ease;
+    }
+    .truck-card.selected { border-color: #0052cc; background-color: #ebf8ff; }
+    .truck-card input[type="checkbox"] { width: 22px; height: 22px; accent-color: #0052cc; pointer-events: none; }
+    .truck-info { flex: 1; }
+    .truck-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .truck-no { font-weight: 700; font-size: 0.95rem; color: #0052cc; }
+    .truck-plate { font-size: 1.05rem; font-weight: 700; color: #2d3748; }
+    .truck-driver { font-size: 0.9rem; color: #718096; font-weight: 500; margin-left: 6px; }
+    .truck-detail { font-size: 0.85rem; color: #718096; display: flex; justify-content: space-between; align-items: baseline; }
+    .truck-weight { font-size: 1.05rem; font-weight: 700; color: #1a202c; }
+    .weight-major { font-size: 1.35rem; font-weight: 800; color: #1a202c; letter-spacing: -0.5px; }
+    .weight-minor { font-size: 0.95rem; font-weight: 600; color: #4a5568; }
+    .sticky-footer {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; padding: 12px 16px;
+      box-shadow: 0 -3px 12px rgba(0,0,0,0.12); border-top: 1px solid #e2e8f0; z-index: 99;
+    }
+    .footer-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+    .footer-title { font-size: 0.85rem; color: #718096; }
+    .footer-total-all { font-size: 0.88rem; color: #4a5568; }
+    .footer-selected-main { font-size: 1.3rem; font-weight: 800; color: #c53030; }
+    .footer-selected-sub { font-size: 0.82rem; color: #718096; }
+
+    /* 手機端工程頁籤滑動列 */
+    .mobile-project-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px 10px 2px;
+      margin-bottom: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-project-tabs::-webkit-scrollbar { display: none; }
+    .m-tab-btn {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #4a5568;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .m-tab-btn.active {
+      background: #0052cc;
+      border-color: #0052cc;
+      color: #ffffff;
+    }
+    .m-tab-count {
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.08);
+    }
+    .m-tab-btn.active .m-tab-count {
+      background: rgba(255,255,255,0.25);
+      color: #ffffff;
+    }
+
+    /* 快取與同步狀態條 */
+    .sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .sync-loading { background: #feebc8; color: #c05621; }
+    .sync-done { background: #c6f6d5; color: #22543d; }
+    .sync-error { background: #fed7d7; color: #9b2c2c; }
+    .spin { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .btn-refresh {
+      background: #edf2f7;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.78rem;
+      color: #4a5568;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .btn-refresh:active { background: #e2e8f0; }
+
+    /* 預計需求量與還要出多少 醒目進度看板 */
+    .demand-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #ebf8ff 0%, #f0fff4 100%);
+      border: 1.5px solid #bee3f8;
+    }
+    .demand-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .demand-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #2c5282;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-set-target {
+      background: #ffffff;
+      border: 1px solid #cbd5e0;
+      color: #3182ce;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .demand-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 8px;
+    }
+    .demand-stat-card {
+      background: #ffffff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .demand-stat-label {
+      font-size: 0.72rem;
+      color: #718096;
+      margin-bottom: 2px;
+    }
+    .demand-stat-value {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #2d3748;
+    }
+    .demand-stat-value.highlight-remain {
+      font-size: 1.25rem;
+      color: #c53030;
+    }
+    .demand-stat-value.highlight-completed {
+      font-size: 1.2rem;
+      color: #2f855a;
+    }
+    .demand-trucks-hint {
+      font-size: 0.74rem;
+      color: #718096;
+      margin-top: 3px;
+    }
+    .demand-progress-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .demand-progress-fill {
+      height: 100%;
+      background: #3182ce;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+  </style>
+  <script src="api-config.js?v=20260920_v3"></script>
+</head>
+<body>
+
+  <!-- 手機端工程分頁標籤滑動列 -->
+  <div class="mobile-project-tabs" id="mobileTabsContainer"></div>
+
+  <div class="header-card">
+    <div class="header-title-row">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h1 id="pageHeadingTitle" style="margin:0; font-size:1.15rem; color:#1a365d;">現場出貨過磅</h1>
+        <span class="badge-readonly" style="background:#2b6cb0; color:#ffffff;">🔍 查詢版</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span id="syncIndicator" class="sync-badge sync-loading"><span class="spin">🔄</span> 同步中...</span>
+        <button class="btn-refresh" onclick="refreshData()" title="手動重新整理">刷新</button>
+      </div>
+    </div>
+    <div class="info-line">客戶：<b id="infoCustomer">-</b></div>
+    <div class="info-line">工程：<b id="infoProject">-</b></div>
+    <div class="info-line">料別：<b id="infoMaterial">-</b></div>
+
+    <!-- 預計需求量與還要出多少進度看板 (唯讀展示) -->
+    <div class="demand-banner" id="demandBanner">
+      <div class="demand-header">
+        <div class="demand-title">📊 <span>工程出貨需求進度</span></div>
+        <span class="badge-readonly" style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; border:1px solid #bee3f8;">👁️ 僅供查閱</span>
+      </div>
+      <div class="demand-stats-grid">
+        <div class="demand-stat-card">
+          <div class="demand-stat-label">預計需求總量</div>
+          <div class="demand-stat-value"><span id="mTargetTon">-</span> <small style="font-size:0.75rem; font-weight:normal; color:#718096;">噸</small></div>
+          <div class="demand-trucks-hint">已出累計：<span id="mDispatchedTon">0.00</span> 噸</div>
+        </div>
+        <div class="demand-stat-card" style="border-left: 3px solid #e53e3e;">
+          <div class="demand-stat-label">⏳ 還要出多少 (尚欠)</div>
+          <div class="demand-stat-value highlight-remain" id="mRemainingTon">-</div>
+          <div class="demand-trucks-hint" id="mEstTrucksHint">約需再出 - 車</div>
+        </div>
+      </div>
+      <div class="demand-progress-bar">
+        <div class="demand-progress-fill" id="mProgressFill" style="width: 0%;"></div>
+      </div>
+
+      <!-- 現場調度狀態 (純唯讀顯示提示) -->
+      <div id="mWaitPhoneAlert" style="display:none; margin-top:8px; padding:8px 12px; background:#fffff0; border:1.5px solid #ecc94b; border-radius:8px; align-items:center; gap:8px;">
+        <span style="font-size:1.1rem;">📞</span>
+        <div>
+          <div style="font-size:0.72rem; color:#744210; font-weight:600;">現場調度指示</div>
+          <div id="mWaitPhoneText" style="font-size:0.95rem; font-weight:800; color:#b7791f;">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tool-panel">
+    <div class="tool-row">
+      <span>車次：第</span>
+      <input type="number" id="rangeFrom" class="range-num" inputmode="numeric" placeholder="1">
+      <span>車 至 第</span>
+      <input type="number" id="rangeTo" class="range-num" inputmode="numeric" placeholder="7">
+      <span>車</span>
+    </div>
+    <div class="tool-row">
+      <span style="font-size: 0.85rem;">車牌篩選：</span>
+      <input type="text" id="plateFilter" class="search-input" placeholder="輸入數字4碼 (如 0931)" oninput="filterCards()">
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-apply" onclick="selectRange()">套用區間</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(true)">全部勾選</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(false)">取消勾選</button>
+    </div>
+  </div>
+
+  <div id="truckList"></div>
+
+  <div class="sticky-footer">
+    <div class="footer-row">
+      <span class="footer-title">全日總發貨</span>
+      <span class="footer-total-all" id="textAllTotal">0 KG (0.00 T)</span>
+    </div>
+    <div class="footer-row">
+      <div>
+        <span class="footer-title">已勾選加總</span>
+        <span class="footer-selected-sub" id="selectedCount">(0 輛)</span>
+      </div>
+      <div class="footer-selected-main" id="textSelectedTotal">0.00 噸</div>
+    </div>
+    <div style="text-align: right; font-size: 0.8rem; color: #a0aec0;" id="textSelectedKg">0 KG</div>
+  </div>
+
+  <script>
+    let dispatches = [];
+    let activeProject = "";
+    let projectCounts = new Map();
+    let projectSettingsMap = {};
+
+    const CACHE_KEY = 'scale_view_cache_data';
+    const CACHE_TIME_KEY = 'scale_view_cache_time';
+
+    // 檢查 URL 參數是否指定了特定工程地點 (例如 ?project=苓雅區武慶三路&target=150)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramProject = urlParams.get('project');
+    if (paramProject) {
+      activeProject = decodeURIComponent(paramProject.trim());
+    }
+    const paramTarget = urlParams.get('target');
+    if (paramTarget && activeProject) {
+      const parsedT = parseFloat(paramTarget);
+      if (parsedT > 0) {
+        localStorage.setItem('scale_target_' + activeProject, parsedT);
+      }
+    }
+    const paramWait = urlParams.get('wait');
+    if (paramWait && activeProject) {
+      localStorage.setItem('scale_wait_phone_' + activeProject, decodeURIComponent(paramWait.trim()));
+    }
+
+    function getProjectTarget(pName) {
+      if (!pName) return 0;
+      const clean = pName.trim();
+      if (projectSettingsMap[clean] && projectSettingsMap[clean].target > 0) {
+        return projectSettingsMap[clean].target;
+      }
+      const val = localStorage.getItem('scale_target_' + clean);
+      return val ? parseFloat(val) : 0;
+    }
+
+
+    function updateDemandBanner() {
+      const banner = document.getElementById('demandBanner');
+      if (!activeProject) {
+        banner.style.display = 'none';
+        return;
+      }
+
+      const targetTon = getProjectTarget(activeProject);
+      const filtered = dispatches.filter(item => item.project === activeProject);
+      const dispatchedKg = filtered.reduce((acc, item) => acc + (Number(item.weight) || 0), 0);
+      const dispatchedTon = dispatchedKg / 1000;
+
+      document.getElementById('mDispatchedTon').textContent = dispatchedTon.toFixed(2);
+
+      // 呈現現場調度等電話狀態 (純唯讀提示)
+      const waitPhone = getProjectWaitPhone(activeProject);
+      const alertBox = document.getElementById('mWaitPhoneAlert');
+      const textEl = document.getElementById('mWaitPhoneText');
+      if (alertBox && textEl) {
+        if (waitPhone) {
+          textEl.textContent = waitPhone;
+          alertBox.style.display = 'flex';
+        } else {
+          alertBox.style.display = 'none';
+        }
+      }
+
+      if (targetTon > 0 || waitPhone) {
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      if (targetTon > 0) {
+        document.getElementById('mTargetTon').textContent = targetTon.toFixed(1);
+        const remainingTon = Math.max(0, targetTon - dispatchedTon);
+        const remainEl = document.getElementById('mRemainingTon');
+        const trucksHintEl = document.getElementById('mEstTrucksHint');
+        const progressFillEl = document.getElementById('mProgressFill');
+
+        // 平均每車重量推估
+        let avgPerTruck = filtered.length > 0 ? (dispatchedTon / filtered.length) : 21.0;
+        if (avgPerTruck <= 0) avgPerTruck = 21.0;
+        const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+
+        const percent = Math.min(100, Math.round((dispatchedTon / targetTon) * 100));
+        progressFillEl.style.width = percent + '%';
+
+        if (remainingTon <= 0) {
+          remainEl.textContent = '0.00 (已達標)';
+          remainEl.className = 'demand-stat-value highlight-completed';
+          trucksHintEl.textContent = `🎉 已達標 (進度 ${percent}%)`;
+          progressFillEl.style.background = '#38a169';
+        } else {
+          remainEl.innerHTML = `<span style="font-size:1.4rem;">${remainingTon.toFixed(2)}</span> <small style="font-size:0.8rem; font-weight:normal; color:#718096;">噸</small>`;
+          remainEl.className = 'demand-stat-value highlight-remain';
+          trucksHintEl.textContent = `約需再出 ${estTrucks} 車 (每車約 ${avgPerTruck.toFixed(1)} 噸)`;
+          progressFillEl.style.background = '#3182ce';
+        }
+      } else {
+        // 未設定目標時
+        document.getElementById('mTargetTon').textContent = '未設定';
+        const remainEl = document.getElementById('mRemainingTon');
+        remainEl.textContent = waitPhone ? '依調度指示' : '未設定';
+        remainEl.className = 'demand-stat-value';
+        remainEl.style.color = '#718096';
+        remainEl.style.fontSize = '0.95rem';
+        document.getElementById('mEstTrucksHint').textContent = waitPhone ? `注意：${waitPhone}` : '未設定目標噸數';
+        document.getElementById('mProgressFill').style.width = '0%';
+      }
+    }
+
+    function getProjectWaitPhone(pName) {
+      if (!pName) return '';
+      const clean = pName.trim();
+      if (projectSettingsMap[clean] && projectSettingsMap[clean].wait) {
+        return projectSettingsMap[clean].wait;
+      }
+      return localStorage.getItem('scale_wait_phone_' + clean) || '';
+    }
+
+
+    // 輔助：更新同步狀態標籤
+    function updateSyncStatus(status, text) {
+      const el = document.getElementById('syncIndicator');
+      if (!el) return;
+      el.className = 'sync-badge ' + (status === 'loading' ? 'sync-loading' : (status === 'done' ? 'sync-done' : 'sync-error'));
+      if (status === 'loading') {
+        el.innerHTML = `<span class="spin">🔄</span> ${text || '同步中...'}`;
+      } else if (status === 'done') {
+        el.innerHTML = `<span>✅</span> ${text || '最新資料'}`;
+      } else {
+        el.innerHTML = `<span>⚠️</span> ${text || '離線或讀取失敗'}`;
+      }
+    }
+
+    // 格式化目前時間 HH:mm
+    function getShortTime() {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // 格式化車重顯示：將千位以上數字 (例如 38,510 中的 38) 稍微放大加粗
+    function formatTruckWeightHtml(weight) {
+      const num = Number(weight) || 0;
+      const str = num.toLocaleString(); // 例如 "38,510" 或 "998"
+      if (str.includes(',')) {
+        const parts = str.split(',');
+        const major = parts.slice(0, -1).join(','); // 例如 "38"
+        const minor = parts[parts.length - 1]; // 例如 "510"
+        return `<span class="weight-major">${major}</span>,<span class="weight-minor">${minor}</span> <span style="font-size:0.82rem; font-weight:600; color:#718096;">KG</span>`;
+      }
+      return `<span class="weight-major">${str}</span> <span style="font-size:0.82rem; font-weight:600; color:#718096;">KG</span>`;
+    }
+
+    // 1. 立即讀取本地快取 (0秒秒開)
+    function loadFromCache() {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const list = JSON.parse(cached);
+          if (Array.isArray(list) && list.length > 0) {
+            dispatches = list;
+            updateProjectCounts();
+            renderProjectTabs();
+            renderList();
+            const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
+            updateSyncStatus('loading', cacheTime ? `快取 (${cacheTime}) 正在同步...` : '同步最新資料...');
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn('快取讀取失敗:', e);
+      }
+      return false;
+    }
+
+    // 2. 背景或主動發起雲端同步
+    async function fetchData(isManual = false) {
+      updateSyncStatus('loading', isManual ? '正在更新...' : '同步最新資料...');
+      try {
+        const freshData = await window.ScaleApi.fetchDispatches();
+
+        // 從 __SET__ 特殊記錄中讀取工程設定（目標噸數、等電話車數、客戶、料別）
+        freshData.filter(r => r.plate === '__SET__').forEach(r => {
+          try {
+            const pName = (r.customer || '').trim();
+            if (!pName || pName === '__PROJECT_CONFIG__') return;
+            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            projectSettingsMap[pName] = {
+              target: Number(cfg.target) || 0,
+              wait: String(cfg.wait || '').trim(),
+              customer: cfg.customer || '',
+              material: cfg.material || ''
+            };
+            if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
+            if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+            if (cfg.customer) localStorage.setItem('scale_customer_' + pName, cfg.customer);
+            if (cfg.material) localStorage.setItem('scale_material_' + pName, cfg.material);
+          } catch(e) {
+            console.warn('解析設定失敗:', e);
+          }
+        });
+
+        // 過濾掉 __SET__ 記錄，只保留真正的出貨車次
+        dispatches = freshData.filter(r => r.plate !== '__SET__');
+
+
+        // 存入本地快取
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(dispatches));
+          localStorage.setItem(CACHE_TIME_KEY, getShortTime());
+        } catch (e) {
+          console.warn('快取寫入失敗:', e);
+        }
+
+        updateProjectCounts();
+        renderProjectTabs();
+        renderList();
+        updateSyncStatus('done', `已更新 (${getShortTime()})`);
+      } catch (err) {
+        console.error('資料載入錯誤:', err);
+        if (dispatches.length > 0) {
+          updateSyncStatus('error', '網路異常 (使用快取)');
+        } else {
+          updateSyncStatus('error', '載入失敗');
+          document.getElementById('truckList').innerHTML = `
+            <div style="text-align:center; padding:30px; color:#e53e3e; font-size:0.95rem;">
+              ⚠️ 雲端資料載入失敗，請確認網路連線或按上方「刷新」重試。<br>
+              <small style="color:#718096; margin-top:8px; display:inline-block;">${err.message || ''}</small>
+            </div>
+          `;
+        }
+      }
+    }
+
+
+
+    // 手動刷新按鈕
+    function refreshData() {
+      fetchData(true);
+    }
+
+    // 初始化流程：先以快取 0 秒展示，隨即背景抓取最新資料 (SWR 模式)
+    function init() {
+      const hasCache = loadFromCache();
+      if (!hasCache) {
+        // 沒有快取時顯示優雅的載入提示，而非一片空白
+        document.getElementById('truckList').innerHTML = `
+          <div style="text-align:center; padding:40px 10px; color:#718096; font-size:0.95rem;">
+            <div class="spin" style="font-size:1.8rem; margin-bottom:10px;">🔄</div>
+            <div>正在初次載入過磅資料，請稍候...</div>
+          </div>
+        `;
+      }
+      fetchData();
+    }
+
+    function updateProjectCounts() {
+      projectCounts.clear();
+      const removedProjects = window.ScaleApi ? window.ScaleApi.getRemovedProjects() : new Set();
+
+      // 先將已設定/雲端建檔的工地納入 (即使尚未出車 count 為 0，排除已被移除之工地)
+      Object.keys(projectSettingsMap).forEach(pName => {
+        const clean = pName.trim();
+        if (clean && clean !== '__PROJECT_CONFIG__' && !removedProjects.has(clean) && !projectCounts.has(clean)) {
+          projectCounts.set(clean, 0);
+        }
+      });
+
+      // 累計各工地出車車次 (排除已被移除之工地)
+      dispatches.forEach(item => {
+        const p = item.project ? item.project.trim() : '';
+        if (p && !removedProjects.has(p)) {
+          projectCounts.set(p, (projectCounts.get(p) || 0) + 1);
+        }
+      });
+
+      // 若未指定或已被移除或不存在於 projectCounts，自動預設為第一個個別工地
+      if (!activeProject || removedProjects.has(activeProject) || !projectCounts.has(activeProject)) {
+        const firstP = projectCounts.keys().next().value;
+        activeProject = firstP || '';
+      }
+    }
+
+    function renderProjectTabs() {
+      const container = document.getElementById('mobileTabsContainer');
+      container.innerHTML = '';
+
+      // 若沒有工地資料，隱藏頁籤
+      if (projectCounts.size === 0) {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'flex';
+
+      // 依需求：不再顯示「全部」，只顯示個別工地分頁
+      projectCounts.forEach((cnt, pName) => {
+        const btn = document.createElement('button');
+        btn.className = 'm-tab-btn' + (activeProject === pName ? ' active' : '');
+        btn.innerHTML = `<span>📍 ${pName}</span><span class="m-tab-count">${cnt} 車</span>`;
+        btn.onclick = () => switchMobileTab(pName);
+        container.appendChild(btn);
+      });
+    }
+
+    function switchMobileTab(pName) {
+      activeProject = pName;
+      renderProjectTabs();
+      renderList();
+    }
+
+    function renderList() {
+      const container = document.getElementById('truckList');
+      container.innerHTML = '';
+      let totalAllKg = 0;
+
+      // 依選中的個別工地過濾車次清單
+      const filtered = activeProject
+        ? dispatches.filter(item => item.project === activeProject)
+        : dispatches;
+
+      const meta = projectSettingsMap[activeProject] || {};
+
+      if (filtered.length > 0) {
+        document.getElementById('infoCustomer').textContent = filtered[0].customer || meta.customer || '-';
+        document.getElementById('infoProject').textContent = activeProject || '-';
+        document.getElementById('infoMaterial').textContent = filtered[0].material || meta.material || '-';
+        document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
+      } else {
+        document.getElementById('infoCustomer').textContent = meta.customer || localStorage.getItem('scale_customer_' + activeProject) || '-';
+        document.getElementById('infoProject').textContent = activeProject || '-';
+        document.getElementById('infoMaterial').textContent = meta.material || localStorage.getItem('scale_material_' + activeProject) || '-';
+        document.getElementById('pageHeadingTitle').textContent = activeProject || '現場出貨過磅';
+        if (activeProject) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:35px 20px; color:#718096; background:#fff; border-radius:12px; margin-top:12px; border:1px dashed #cbd5e0;">
+              <div style="font-size:1.6rem; margin-bottom:8px;">🚚</div>
+              <div style="font-size:1rem; font-weight:600; color:#4a5568;">【${activeProject}】目前尚無出車過磅記錄</div>
+              <small style="color:#a0aec0; margin-top:6px; display:inline-block;">車輛過磅出場後將自動即時顯示於此</small>
+            </div>
+          `;
+        }
+      }
+
+      filtered.forEach((item, index) => {
+        totalAllKg += item.weight;
+        const card = document.createElement('div');
+        card.className = 'truck-card';
+        card.id = `card-${index}`;
+
+        card.onclick = () => {
+          const cb = card.querySelector('input[type="checkbox"]');
+          cb.checked = !cb.checked;
+          updateCardStyle(card, cb.checked);
+          calculate();
+        };
+
+        const driverStr = item.driver != null ? String(item.driver) : '-';
+        let driverDisplay = driverStr;
+        let cargoTagHtml = '';
+        if (driverStr && (driverStr.includes("  ") || driverStr.includes("    "))) {
+          const parts = driverStr.split(/\s{2,}/);
+          driverDisplay = parts[0];
+          const cargoPart = parts.slice(1).join(" ");
+          cargoTagHtml = `<div style="margin-top: 3px;"><span style="display:inline-block; font-size:0.75rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; font-weight:600;">📦 ${cargoPart}</span></div>`;
+        }
+
+        card.innerHTML = `
+          <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}">
+          <div class="truck-info">
+            <div class="truck-head">
+              <span class="truck-no">第 ${index + 1} 車</span>
+              <div style="text-align: right;">
+                <div>
+                  <span class="truck-plate">${item.plate}</span>
+                  <span class="truck-driver">${driverDisplay}</span>
+                </div>
+                ${cargoTagHtml}
+              </div>
+            </div>
+            <div class="truck-detail">
+              <span>出廠 ${item.exit_time}</span>
+              <div class="truck-weight">${formatTruckWeightHtml(item.weight)}</div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // 尾台摘要卡：在最後一台車之後顯示本工地調度摘要
+      if (activeProject && filtered.length > 0) {
+        const targetTon = getProjectTarget(activeProject);
+        const dispatchedKg = filtered.reduce((acc, it) => acc + (Number(it.weight) || 0), 0);
+        const dispatchedTon = dispatchedKg / 1000;
+        const waitPhone = getProjectWaitPhone(activeProject);
+
+        let targetRow = '';
+        let remainRow = '';
+        if (targetTon > 0) {
+          const remainingTon = Math.max(0, targetTon - dispatchedTon);
+          const pct = Math.min(100, Math.round((dispatchedTon / targetTon) * 100));
+          let avgPerTruck = filtered.length > 0 ? (dispatchedTon / filtered.length) : 21.0;
+          if (avgPerTruck <= 0) avgPerTruck = 21.0;
+          const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+          const remainLabel = remainingTon <= 0
+            ? `<span style="color:#2f855a;font-weight:800;">✅ 已達標</span>`
+            : `<span style="color:#c53030;font-weight:800;">${remainingTon.toFixed(2)} 噸</span><span style="font-size:0.78rem;color:#718096;"> (約需再出 ${estTrucks} 車)</span>`;
+          targetRow = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🎯 預計總量</span>
+              <span style="font-weight:700;color:#2b6cb0;">${targetTon.toFixed(1)} 噸</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🚚 已出累計</span>
+              <span style="font-weight:700;color:#2d3748;">${dispatchedTon.toFixed(2)} 噸 (${pct}%)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;${waitPhone ? 'border-bottom:1px solid #e2e8f0;' : ''}">
+              <span style="font-size:0.8rem;color:#718096;">⏳ 還要出</span>
+              <span>${remainLabel}</span>
+            </div>`;
+        } else {
+          targetRow = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:0.8rem;color:#718096;">🚚 已出累計</span>
+              <span style="font-weight:700;color:#2d3748;">${dispatchedTon.toFixed(2)} 噸</span>
+            </div>`;
+        }
+
+        let waitRow = '';
+        if (waitPhone) {
+          waitRow = `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+              <span style="font-size:1rem;">📞</span>
+              <div>
+                <div style="font-size:0.72rem;color:#744210;font-weight:600;">現場調度指示</div>
+                <div style="font-size:0.95rem;font-weight:800;color:#b7791f;">${waitPhone}</div>
+              </div>
+            </div>`;
+        }
+
+        const tailCard = document.createElement('div');
+        tailCard.style.cssText = 'margin:10px 12px 6px;padding:10px 14px;background:linear-gradient(135deg,#ebf8ff 0%,#f0fff4 100%);border:1.5px solid #bee3f8;border-radius:12px;font-size:0.88rem;';
+        tailCard.innerHTML = `
+          <div style="font-size:0.78rem;font-weight:700;color:#2c5282;margin-bottom:6px;display:flex;align-items:center;gap:4px;">
+            📊 第 ${filtered.length} 車（尾台）出貨摘要
+            <span style="margin-left:auto;font-size:0.7rem;background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8;padding:1px 6px;border-radius:8px;">👁️ 僅供查閱</span>
+          </div>
+          ${targetRow}
+          ${waitRow}
+        `;
+        container.appendChild(tailCard);
+      }
+
+      const totalTitle = activeProject ? `【${activeProject}】總發貨` : "工地總發貨";
+      document.querySelector('.sticky-footer .footer-title').textContent = totalTitle;
+      document.getElementById('textAllTotal').textContent = `${totalAllKg.toLocaleString()} KG (${(totalAllKg / 1000).toFixed(2)} T)`;
+      updateDemandBanner();
+      calculate();
+    }
+
+    function updateCardStyle(card, isChecked) {
+      if (isChecked) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+
+    function calculate() {
+      const checkboxes = document.querySelectorAll('.car-check');
+      let sum = 0, count = 0;
+      checkboxes.forEach((cb) => {
+        if (cb.checked) {
+          sum += Number(cb.dataset.weight);
+          count++;
+        }
+      });
+      document.getElementById('textSelectedTotal').textContent = `${(sum / 1000).toFixed(2)} 噸`;
+      document.getElementById('textSelectedKg').textContent = `${sum.toLocaleString()} KG`;
+      document.getElementById('selectedCount').textContent = `(${count} 輛)`;
+    }
+
+    function selectRange() {
+      const from = parseInt(document.getElementById('rangeFrom').value, 10);
+      const to = parseInt(document.getElementById('rangeTo').value, 10);
+      if (isNaN(from) || isNaN(to) || from > to) return;
+
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const order = idx + 1;
+        const shouldCheck = order >= from && order <= to;
+        cb.checked = shouldCheck;
+        updateCardStyle(document.getElementById(`card-${idx}`), shouldCheck);
+      });
+      calculate();
+    }
+
+    function setSelectAll(status) {
+      document.querySelectorAll('.car-check').forEach((cb, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        if (card.style.display !== 'none') {
+          cb.checked = status;
+          updateCardStyle(card, status);
+        }
+      });
+      calculate();
+    }
+
+    function filterCards() {
+      const keyword = document.getElementById('plateFilter').value.trim().toUpperCase();
+      dispatches.forEach((item, idx) => {
+        const card = document.getElementById(`card-${idx}`);
+        const plateClean = item.plate.replace('-', '').toUpperCase();
+        const matches = plateClean.includes(keyword) || item.plate.toUpperCase().includes(keyword);
+        card.style.display = matches ? 'flex' : 'none';
+      });
+    }
+
+    // 啟動 (SWR 快取立即呈現 + 背景更新)
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地磅調度出貨管理系統</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 24px; background: #f0f2f5; color: #1a1a1a; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #0052cc; padding-bottom: 8px; color: #0052cc; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .form-col { display: flex; flex-direction: column; }
+    .form-label-row { display: flex; justify-content: space-between; align-items: center; min-height: 24px; margin-bottom: 4px; }
+    label { font-size: 0.85rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 4px; line-height: 1.2; }
+    .form-label-row label { margin-bottom: 0; }
+    input, select {
+      width: 100%; height: 38px; padding: 7px 10px; border: 1px solid #cbd5e0;
+      border-radius: 4px; box-sizing: border-box; font-size: 0.92rem;
+      font-family: inherit; vertical-align: middle;
+    }
+    input:focus, select:focus { outline: none; border-color: #0052cc; }
+    button { padding: 9px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem; font-family: inherit; }
+    .btn-primary { background: #0052cc; color: white; }
+    .btn-primary:hover { background: #0747a6; }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; text-align: left; }
+    th, td { padding: 10px; border-bottom: 1px solid #edf2f7; font-size: 0.95rem; }
+    th { background: #f7fafc; color: #4a5568; }
+    .summary-bar { background: #ebf8ff; border: 1px solid #bee3f8; padding: 14px 20px; border-radius: 6px; margin-top: 16px; display: flex; flex-wrap: wrap; gap: 24px; font-size: 1rem; align-items: center; }
+    .highlight { color: #c53030; font-weight: 700; font-size: 1.15rem; }
+    .range-box { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px; }
+    .range-box input { width: 75px; height: 34px; }
+    .del-btn { background: none; border: none; color: #e53e3e; cursor: pointer; font-weight: 600; padding: 2px 4px; }
+    .del-btn:hover { text-decoration: underline; }
+    .edit-row-btn { background: none; border: none; color: #0052cc; cursor: pointer; font-weight: 600; padding: 2px 4px; margin-right: 4px; }
+    .edit-row-btn:hover { text-decoration: underline; }
+    .editing-highlight { background-color: #ebf8ff !important; border-left: 3px solid #0052cc !important; }
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute; top: 100%; left: 0; right: 0; background: white;
+      border: 1px solid #cbd5e0; border-top: none; border-radius: 0 0 6px 6px;
+      max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .autocomplete-item { padding: 8px 12px; cursor: pointer; font-size: 0.9rem; display: flex; justify-content: space-between; }
+    .autocomplete-item:hover { background-color: #ebf8ff; color: #0052cc; font-weight: 600; }
+    .server-setting-bar { display: none; background: #edf2f7; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #4a5568; }
+    .server-setting-bar input { width: 320px; padding: 6px 10px; font-size: 0.85rem; }
+    .badge-cloud { background: #3182ce; color: white; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+    .quick-item-btn {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; background: #edf2f7; border: 1px solid #cbd5e0;
+      border-radius: 12px; font-size: 0.78rem; font-weight: 600; color: #2d3748;
+      cursor: pointer; transition: all 0.15s ease; user-select: none;
+    }
+    .quick-item-btn:hover { background: #e2e8f0; border-color: #a0aec0; }
+    .quick-item-btn:active { background: #cbd5e0; }
+
+    /* 司機車牌管理彈窗樣式 */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); z-index: 2000;
+      display: none; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .modal-box {
+      background: #ffffff; border-radius: 10px; width: 100%; max-width: 650px;
+      max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden;
+    }
+    .modal-header {
+      padding: 16px 20px; background: #0052cc; color: white;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h3 { margin: 0; font-size: 1.15rem; }
+    .modal-close-btn { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1; }
+    .modal-body { padding: 18px 20px; overflow-y: auto; flex: 1; }
+    .vehicle-form-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: flex-end; }
+    .vehicle-table-wrap { border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; max-height: 380px; overflow-y: auto; }
+    .btn-edit-sm { background: #3182ce; color: white; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; margin-right: 4px; }
+    .btn-del-sm { background: #e53e3e; color: white; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; }
+
+    /* 方案 1：多工程分頁籤樣式 */
+    .project-tabs-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .project-tab-btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e0;
+      color: #4a5568;
+      font-weight: 700;
+      font-size: 0.92rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .project-tab-btn:hover {
+      background: #ebf8ff;
+      border-color: #0052cc;
+      color: #0052cc;
+    }
+    .project-tab-btn.active {
+      background: #0052cc;
+      border-color: #0052cc;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,82,204,0.25);
+    }
+    .project-tab-count {
+      font-size: 0.78rem;
+      padding: 2px 7px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.08);
+      font-weight: 700;
+    }
+    .project-tab-btn.active .project-tab-count {
+      background: rgba(255,255,255,0.25);
+      color: #ffffff;
+    }
+    .btn-add-tab {
+      background: #edf2f7;
+      border: 1.5px dashed #a0aec0;
+      color: #4a5568;
+    }
+    .btn-add-tab:hover {
+      background: #e2e8f0;
+      border-color: #718096;
+    }
+
+    /* 手機版適配樣式 (在手機開啟編輯版時自適應流暢排版) */
+    .table-scroll-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-top: 14px;
+    }
+    .badge-edit-mode {
+      background: #0052cc;
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .nav-switch-btn {
+      background: #edf2f7;
+      border: 1px solid #cbd5e0;
+      color: #2d3748;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        margin: 10px;
+        padding-bottom: 30px;
+      }
+      .card {
+        padding: 14px 12px;
+        margin-bottom: 12px;
+      }
+      .server-setting-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .server-setting-bar input {
+        width: 100%;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .range-box {
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 0.88rem;
+      }
+      .range-box input {
+        width: 55px;
+      }
+      .summary-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 0.95rem;
+      }
+      .btn-primary {
+        width: 100%;
+        padding: 12px;
+        font-size: 1rem;
+      }
+      th, td {
+        padding: 8px 6px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+      }
+    }
+  </style>
+  <script src="api-config.js"></script>
+</head>
+<body>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <h1 style="margin: 0; font-size: 1.3rem; color: #1a202c; font-weight: 800;">地磅調度出貨系統</h1>
+      <span class="badge-edit-mode">✍️ 編輯版</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button onclick="toggleServerBar()" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:0.85rem; padding:4px;" title="API伺服器設定">⚙️</button>
+      <a href="view.html" class="nav-switch-btn">📱 前往「查詢版」</a>
+    </div>
+  </div>
+
+  <div class="server-setting-bar" id="serverSettingBar">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span class="badge-cloud">雲端後端</span>
+      <span>API 伺服器：</span>
+      <input type="text" id="apiServerInput" placeholder="本機預設同源，或輸入 https://your-backend.onrender.com">
+      <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="saveApiServer()">儲存設定</button>
+    </div>
+    <div style="font-size: 0.8rem; color: #718096;" id="apiStatusText">就緒</div>
+  </div>
+
+  <!-- 方案 1：工程地點分頁標籤切換列 -->
+  <div class="project-tabs-container" id="projectTabsContainer">
+    <!-- 動態生成頁籤 -->
+  </div>
+
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-bottom: 12px;">
+      <h2 style="margin: 0; border: none; padding: 0;">工程項目設定</h2>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="openProjectManager()">⚙️ 管理工地建檔</button>
+        <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 10px;" onclick="openProjectManager(true)">＋ 預先建檔工程</button>
+      </div>
+    </div>
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); align-items: start;">
+      <div class="form-col">
+        <div class="form-label-row"><label>客戶名稱</label></div>
+        <input type="text" id="customer" value="高雄市政府" oninput="onCustomerFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>工程名稱 / 地點</label></div>
+        <input type="text" id="project" value="苓雅區武慶三路" oninput="onProjectFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>品名 / 料別</label></div>
+        <input type="text" id="material" value="1/2密集配" oninput="onMaterialFormInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label>預計總量 (噸)</label>
+          <span style="font-size:0.75rem; color:#0052cc; cursor:pointer; font-weight:600;" onclick="setTargetPrompt()">✎ 設定</span>
+        </div>
+        <input type="text" inputmode="decimal" id="projectTarget" placeholder="例如: 600" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onTargetInput(this.value)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label style="color:#c53030; font-weight:700;">⏳ 還要出 (噸)</label>
+          <span style="font-size:0.75rem; color:#718096;">可手key</span>
+        </div>
+        <input type="text" inputmode="decimal" id="projectRemainingInput" placeholder="例如: 60.5" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onRemainingInput(this.value)" style="border-color:#feb2b2; background:#fffaf0; font-weight:700; color:#c53030;">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label style="color:#d69e2e; font-weight:700; white-space:nowrap;">📞 等電話／車數</label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select id="waitPhoneQuickSelect" style="width:100%; height:32px; padding:2px 8px; font-size:0.82rem; border-radius:4px; border:1px solid #ecc94b; background:#fff; color:#b7791f; cursor:pointer;" onchange="applyWaitPhoneSelect(this.value)">
+            <option value="">-- 快選下拉 --</option>
+            <option value="1台等電話">📞 1台等電話</option>
+            <option value="2台等電話">📞 2台等電話</option>
+            <option value="3台等電話">📞 3台等電話</option>
+            <option value="全數等電話通知">⚠️ 全數等電話通知</option>
+            <option value="正常出車">✅ 正常出車</option>
+            <option value="CLEAR">✕ 清除</option>
+          </select>
+          <input type="text" id="projectWaitPhoneInput" placeholder="可選上方快選或手動輸入" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="onWaitPhoneInput(this.value)" style="border-color:#ecc94b; background:#fffff0; font-weight:700; color:#b7791f;">
+        </div>
+      </div>
+    </div>
+    <div id="projectDemandStatus" style="display:flex; background:#f7fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px 14px; font-size:0.88rem; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span>🎯 目標總量：<b id="dispTargetTon" style="color:#2b6cb0;">0.0</b> 噸</span>
+        <span>🚚 已出累計：<b id="dispCurrentTon" style="color:#2d3748;">0.00</b> 噸</span>
+        <span>⏳ 尚欠／還要出：<b id="dispRemainingTon" style="font-size:1.15rem; color:#c53030;">0.00</b> 噸</span>
+        <span id="dispRemainingTrucks" style="font-size:0.82rem; color:#4a5568; background:#edf2f7; padding:2px 8px; border-radius:10px;"></span>
+        <span id="dispWaitPhoneBadge" style="display:none; font-size:0.85rem; color:#b7791f; background:#fefcbf; border:1px solid #f6e05e; padding:3px 10px; border-radius:12px; font-weight:700;"></span>
+        <span id="projectSyncBadge" style="display:none; font-size:0.75rem; padding:2px 8px; border-radius:10px;"></span>
+      </div>
+      <button class="btn-secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="copyProjectShareLink()">📋 複製手機版連結傳給主任</button>
+    </div>
+  </div>
+
+  <div class="card" id="dispatchFormCard">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0052cc; padding-bottom: 8px; margin-bottom: 12px;">
+      <h2 style="margin: 0; border: none; padding: 0;" id="dispatchFormTitle">單車次過磅紀錄新增</h2>
+      <button class="btn-secondary" style="font-size: 0.8rem; padding: 5px 12px; background: #ebf8ff; color: #0052cc; border: 1px solid #bee3f8;" onclick="openVehicleManager()">⚙️ 管理司機車牌名單</button>
+    </div>
+    <input type="hidden" id="editDispatchId" value="">
+    <div class="grid" style="align-items: start;">
+      <div class="form-col autocomplete-wrap">
+        <div class="form-label-row"><label>車牌 (輸入數字4碼快選)</label></div>
+        <input type="text" id="plate" placeholder="例如輸入 0931 或 6663" autocomplete="off" oninput="onPlateInput(this.value)" onfocus="onPlateInput(this.value)" onclick="onPlateInput(this.value)">
+        <div id="plateDropdown" class="autocomplete-list"></div>
+      </div>
+      <div class="form-col autocomplete-wrap">
+        <div class="form-label-row"><label>司機姓名 (點選名單或輸入)</label></div>
+        <input type="text" id="driver" placeholder="點擊看名單或輸入快選" autocomplete="off" oninput="onDriverInput(this.value)" onfocus="onDriverInput(this.value)" onclick="onDriverInput(this.value)">
+        <div id="driverDropdown" class="autocomplete-list"></div>
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>實重 (KG)</label></div>
+        <input type="number" id="weight" placeholder="例如: 44080">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row"><label>出場時間 (輸入數字如 1158)</label></div>
+        <input type="text" id="exit_time" placeholder="例如: 1158" maxlength="5" inputmode="numeric" oninput="formatTimeInput(this)" onblur="autoFormatTime(this)">
+      </div>
+      <div class="form-col">
+        <div class="form-label-row">
+          <label style="white-space:nowrap;">隨車寄送／備註物品</label>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <select id="cargoQuickSelect" style="width: 100%; height: 32px; padding: 2px 8px; font-size: 0.82rem; border-radius: 4px; border: 1px solid #cbd5e0; background: #fff; color: #4a5568;" onchange="applyCargoSelect(this.value)">
+            <option value="">-- 常用物品下拉選單 --</option>
+            <option value="黏油1顆">🛢️ 黏油 1 顆</option>
+            <option value="黏油2顆">🛢️ 黏油 2 顆</option>
+            <option value="小便當1個">🍱 小便當 1 個</option>
+            <option value="小便當2個">🍱 小便當 2 個</option>
+            <option value="大便當1個">🍱 大便當 1 個</option>
+            <option value="大便當2個">🍱 大便當 2 個</option>
+            <option value="便當">🍱 便當</option>
+            <option value="物品">📦 物品</option>
+            <option value="清潔劑">🧴 清潔劑</option>
+            <option value="手套">🧤 手套</option>
+            <option value="工具">🔧 工具</option>
+          </select>
+          <input type="text" id="cargo_notes" placeholder="可直接手寫或點選下方快捷 (如: 黏油1顆)" autocomplete="off">
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('黏油1顆')">＋黏油1顆</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('小便當1個')">＋小便當1個</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('大便當1個')">＋大便當1個</button>
+          <button type="button" class="quick-item-btn" onclick="addCargoTag('物品')">＋物品</button>
+          <button type="button" class="quick-item-btn" style="color: #c53030;" onclick="clearCargoTags()">✕ 清除</button>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn-primary" id="btnSubmitDispatch" onclick="submitEntry()">儲存並發送</button>
+      <button class="btn-secondary" id="btnCancelEditDispatch" style="display: none;" onclick="cancelEditEntry()">取消編輯</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>車次清單與區間結算</h2>
+    <div class="range-box">
+      <span>區間計算：從第</span>
+      <input type="number" id="fromIndex" min="1">
+      <span>車 至 第</span>
+      <input type="number" id="toIndex" min="1">
+      <span>車</span>
+      <button class="btn-secondary" onclick="applyRangeSelection()">套用選取</button>
+      <button class="btn-secondary" onclick="toggleSelectAll(true)">全選</button>
+      <button class="btn-secondary" onclick="toggleSelectAll(false)">清除選取</button>
+      <button class="btn-secondary" style="background:#fff5f5; color:#c53030; border: 1px solid #feb2b2; margin-left: auto;" onclick="batchDeleteSelected()">🗑️ 刪除已勾選車次</button>
+    </div>
+
+    <div class="table-scroll-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this.checked)"></th>
+            <th width="60">車次</th>
+            <th>客戶 / 工程 / 料別</th>
+            <th>司機</th>
+            <th>車牌</th>
+            <th>隨車寄送 / 備註</th>
+            <th>實重 (KG)</th>
+            <th>累計重量 (KG)</th>
+            <th>出場時間</th>
+            <th width="95" style="text-align: center;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary-bar">
+      <div><span id="projectTotalLabel">工地總重：</span><span id="allTotalKg" style="font-weight: bold;">0</span> KG (<span id="allTotalTon" style="font-weight: bold;">0.00</span> 噸)</div>
+      <div>勾選加總：<span id="selectedKg" class="highlight">0</span> KG (<span id="selectedTon" class="highlight">0.00</span> 噸)</div>
+    </div>
+  </div>
+
+  <!-- 司機與車牌即時管理彈窗 -->
+  <div class="modal-overlay" id="vehicleModalOverlay" onclick="closeVehicleManagerIfOutside(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📋 司機與車牌名單管理</h3>
+        <button class="modal-close-btn" onclick="closeVehicleManager()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 14px;">
+          <div style="font-weight: 700; color: #2d3748; margin-bottom: 8px; font-size: 0.9rem;" id="vehicleFormTitle">➕ 新增司機／車牌</div>
+          <input type="hidden" id="editVehicleIndex" value="-1">
+          <div class="vehicle-form-row">
+            <div style="flex: 1;">
+              <label>車牌號碼 (如 KLA-7698)</label>
+              <input type="text" id="mgrPlate" placeholder="請輸入車牌">
+            </div>
+            <div style="flex: 1;">
+              <label>司機姓名 (如 阿賢)</label>
+              <input type="text" id="mgrDriver" placeholder="請輸入司機姓名">
+            </div>
+            <div>
+              <button class="btn-primary" style="padding: 8px 16px;" id="btnSaveVehicle" onclick="saveVehicleItem()">儲存</button>
+              <button class="btn-secondary" style="padding: 8px 12px; display: none;" id="btnCancelEdit" onclick="cancelVehicleEdit()">取消</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 700; color: #4a5568; font-size: 0.9rem;">現有名單 (<span id="mgrVehicleCount">0</span> 筆)</span>
+          </div>
+          <div style="position: relative; flex: 1; max-width: 280px; min-width: 190px;">
+            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #a0aec0; pointer-events: none; font-size: 0.85rem;">🔍</span>
+            <input type="text" id="mgrVehicleSearch" placeholder="搜尋車牌 (如 0723) 或司機..." 
+                   oninput="onVehicleSearchInput(this.value)"
+                   onkeydown="if(event.key==='Escape'){clearVehicleSearch();}"
+                   style="width: 100%; padding: 6px 28px 6px 30px; font-size: 0.85rem; border: 1.5px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; outline: none; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='#0052cc'" onblur="this.style.borderColor='#cbd5e0'">
+            <button type="button" onclick="clearVehicleSearch()" id="btnVehicleSearchClear" 
+                    title="清除搜尋"
+                    style="display: none; position: absolute; right: 7px; top: 50%; transform: translateY(-50%); background: #e2e8f0; border: none; color: #4a5568; cursor: pointer; font-size: 0.75rem; width: 18px; height: 18px; border-radius: 50%; padding: 0; line-height: 18px; text-align: center;">✕</button>
+          </div>
+        </div>
+
+        <div class="vehicle-table-wrap">
+          <table style="margin-top: 0;">
+            <thead>
+              <tr>
+                <th width="50">#</th>
+                <th>車牌號碼</th>
+                <th>司機姓名</th>
+                <th width="110" style="text-align: center;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="mgrVehicleTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 工地與工程預先建檔管理彈窗 -->
+  <div class="modal-overlay" id="projectModalOverlay">
+    <div class="modal-box" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3>🏗️ 工程／工地名單建檔與管理</h3>
+        <button type="button" class="modal-close-btn" onclick="closeProjectManager()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #f8fafc; padding: 14px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: 700; color: #2d3748; font-size: 0.95rem;" id="projectFormTitle">➕ 預先建檔新工程／工地</span>
+            <span style="font-size: 0.78rem; color: #718096;">建檔後會在頂端顯示頁籤，出車時點選立馬切換</span>
+          </div>
+          <input type="hidden" id="editProjectIndex" value="-1">
+          <input type="hidden" id="editProjectOldName" value="">
+          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; align-items: start;">
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">工程名稱 / 地點 <span style="color:#e53e3e;">*</span></label>
+              <input type="text" id="mgrProjectName" placeholder="例如: 苓雅區武慶三路" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">客戶名稱</label>
+              <input type="text" id="mgrProjectCustomer" placeholder="例如: 高雄市政府" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">品名 / 料別</label>
+              <input type="text" id="mgrProjectMaterial" placeholder="例如: 1/2密集配" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #4a5568; margin-bottom: 3px; display: block;">預計總量 (噸)</label>
+              <input type="number" step="any" id="mgrProjectTarget" placeholder="例如: 500" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 700; color: #d69e2e; margin-bottom: 3px; display: block;">📞 等電話／車數</label>
+              <input type="text" id="mgrProjectWaitPhone" placeholder="例如: 2台等電話" style="padding: 6px 8px; font-size: 0.88rem;">
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn-secondary" style="padding: 6px 14px; display: none;" id="btnCancelProjectEdit" onclick="cancelProjectEdit()">取消修改</button>
+            <button type="button" class="btn-primary" style="padding: 6px 18px;" id="btnSaveProject" onclick="saveProjectItem()">💾 儲存建檔</button>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 700; color: #4a5568; font-size: 0.9rem;">現有工程名單 (<span id="mgrProjectCount">0</span> 個地點)</span>
+          <span style="font-size: 0.78rem; color: #718096;">可直接點「🚀 切換此工地」立馬開始出車過磅</span>
+        </div>
+
+        <div class="vehicle-table-wrap">
+          <table style="margin-top: 0;">
+            <thead>
+              <tr>
+                <th width="40">#</th>
+                <th>工程名稱 / 地點</th>
+                <th>客戶名稱</th>
+                <th>料別</th>
+                <th>需求噸數</th>
+                <th>等電話狀態</th>
+                <th width="70" style="text-align: center;">已出車數</th>
+                <th width="150" style="text-align: center;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="mgrProjectTableBody"></tbody>
+          </table>
+        </div>
+        <div id="mgrRemovedContainer" style="display:none; margin-top:15px; padding-top:12px; border-top:1px dashed #cbd5e0;">
+          <div style="font-size:0.85rem; font-weight:600; color:#718096; margin-bottom:6px;">📦 已封存／已移除的工程地點（點「恢復」即可重新加入頂部頁籤）：</div>
+          <div id="mgrRemovedList" style="display:flex; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_PRESET_VEHICLES = [
+      { plate: "LAP-083", driver: "文造(大車管理)" }, { plate: "KLH-0723", driver: "豬哥晉" },
+      { plate: "KLE-7387", driver: "龍哥" }, { plate: "LAP-116", driver: "道友" },
+      { plate: "KLH-0612", driver: "150" }, { plate: "KLH-0721", driver: "86" },
+      { plate: "KLB-7757", driver: "螺雷" }, { plate: "KLE-5136", driver: "小白" },
+      { plate: "JF-C88", driver: "烏龜" }, { plate: "KLE-8819", driver: "小木屋" },
+      { plate: "KLF-6505", driver: "阿學" }, { plate: "KLF-6018", driver: "國光" },
+      { plate: "KLD-8939", driver: "發仔" }, { plate: "KLF-6882", driver: "雙管" },
+      { plate: "KLH-1367", driver: "大頭" }, { plate: "KLK-2755", driver: "高粱" },
+      { plate: "KLH-5118", driver: "小劉" }, { plate: "KLE-7976", driver: "牛奶" },
+      { plate: "KLB-6663", driver: "凍皮/和" }, { plate: "KEM-1218", driver: "企鵝(小車管理)" },
+      { plate: "KLF-6776", driver: "黑龍" }, { plate: "777-G7", driver: "單純" },
+      { plate: "KLH-0831", driver: "楊高義" }, { plate: "KLH-5295", driver: "阿德" },
+      { plate: "KLL-2778", driver: "巴尼" }, { plate: "KLK-0757", driver: "黑人" },
+      { plate: "KER-9559", driver: "誠阿" }, { plate: "KLF-6855", driver: "" },
+      { plate: "KES-9799", driver: "掃把" }, { plate: "KEM-0206", driver: "阿傑" },
+      { plate: "KLF-6085", driver: "閔仔" }, { plate: "KLE-7590", driver: "豆腐" },
+      { plate: "KLH-5111", driver: "小宇" }, { plate: "KLH-2828", driver: "架尬" },
+      { plate: "KLN-1027", driver: "豆花" }, { plate: "KLF-6106", driver: "紹興" },
+      { plate: "KLH-0931", driver: "王進展" }, { plate: "KLE-9201", driver: "小書包" },
+      { plate: "949-H9", driver: "控肉" }, { plate: "KLB-9315", driver: "阿憲" },
+      { plate: "KLL-2206", driver: "龍" }, { plate: "KLH-0585", driver: "" },
+      { plate: "KEP-8398", driver: "燒酒" }, { plate: "KEW-2792", driver: "陳平和" },
+      { plate: "KEH-5955", driver: "泰" }, { plate: "KLB-7158", driver: "" },
+      { plate: "KLK-5878", driver: "阿廷" }, { plate: "KEM-3076", driver: "" },
+      { plate: "KLA-7698", driver: "阿賢" }, { plate: "KLD-2671", driver: "阿ㄒㄧㄢˋ" },
+      { plate: "KLN-8553", driver: "吸管" }, { plate: "KLG-8675", driver: "阿義" },
+      { plate: "KLM-0929", driver: "" }, { plate: "KLE-9550", driver: "" },
+      { plate: "KLL-2789", driver: "" }, { plate: "KLN-7963", driver: "" }
+    ];
+
+    const STORAGE_VEHICLE_KEY = 'scale_custom_vehicles_v2';
+    function loadPresetVehicles() {
+      try {
+        const saved = localStorage.getItem(STORAGE_VEHICLE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.error("載入自訂司機名單錯誤:", e);
+      }
+      return [...DEFAULT_PRESET_VEHICLES];
+    }
+
+    function savePresetVehicles() {
+      localStorage.setItem(STORAGE_VEHICLE_KEY, JSON.stringify(presetVehicles));
+    }
+
+    let presetVehicles = loadPresetVehicles();
+
+    let vehicleSearchKeyword = "";
+
+    function onVehicleSearchInput(val) {
+      vehicleSearchKeyword = (val || "").trim();
+      const clearBtn = document.getElementById("btnVehicleSearchClear");
+      if (clearBtn) {
+        clearBtn.style.display = vehicleSearchKeyword ? "block" : "none";
+      }
+      renderVehicleManagerTable();
+    }
+
+    function clearVehicleSearch() {
+      vehicleSearchKeyword = "";
+      const input = document.getElementById("mgrVehicleSearch");
+      if (input) {
+        input.value = "";
+        input.focus();
+      }
+      const clearBtn = document.getElementById("btnVehicleSearchClear");
+      if (clearBtn) clearBtn.style.display = "none";
+      renderVehicleManagerTable();
+    }
+
+    function highlightVehicleMatch(text, query) {
+      if (!text || !query) return text || '';
+      const str = String(text);
+      const cleanQ = query.trim();
+      if (!cleanQ) return str;
+      const lowerStr = str.toLowerCase();
+      const lowerQ = cleanQ.toLowerCase();
+      const idx = lowerStr.indexOf(lowerQ);
+      if (idx !== -1) {
+        const before = str.slice(0, idx);
+        const match = str.slice(idx, idx + lowerQ.length);
+        const after = str.slice(idx + lowerQ.length);
+        return `${before}<mark style="background:#fefcbf; color:#744210; padding:1px 3px; border-radius:2px; font-weight:bold;">${match}</mark>${after}`;
+      }
+      // 支援純數字部分匹配 (例如輸入 0723 匹配 KLH-0723)
+      const digitsQ = cleanQ.replace(/[^0-9]/g, '');
+      if (digitsQ && digitsQ.length >= 2) {
+        const numIdx = str.indexOf(digitsQ);
+        if (numIdx !== -1) {
+          const before = str.slice(0, numIdx);
+          const match = str.slice(numIdx, numIdx + digitsQ.length);
+          const after = str.slice(numIdx + digitsQ.length);
+          return `${before}<mark style="background:#fefcbf; color:#744210; padding:1px 3px; border-radius:2px; font-weight:bold;">${match}</mark>${after}`;
+        }
+      }
+      return str;
+    }
+
+    // 司機名單管理彈窗邏輯
+    function openVehicleManager() {
+      document.getElementById("vehicleModalOverlay").style.display = "flex";
+      cancelVehicleEdit();
+      clearVehicleSearch();
+      renderVehicleManagerTable();
+      setTimeout(() => {
+        const sInput = document.getElementById("mgrVehicleSearch");
+        if (sInput) sInput.focus();
+      }, 100);
+    }
+
+    function closeVehicleManager() {
+      document.getElementById("vehicleModalOverlay").style.display = "none";
+    }
+
+    function closeVehicleManagerIfOutside(e) {
+      if (e.target.id === "vehicleModalOverlay") {
+        closeVehicleManager();
+      }
+    }
+
+    function renderVehicleManagerTable() {
+      const tbody = document.getElementById("mgrVehicleTableBody");
+      tbody.innerHTML = "";
+
+      const query = (vehicleSearchKeyword || "").trim().toLowerCase();
+      let matchCount = 0;
+
+      presetVehicles.forEach((item, idx) => {
+        const plate = (item.plate || "").toLowerCase();
+        const driver = (item.driver || "").toLowerCase();
+        if (query) {
+          const isPlateMatch = plate.includes(query) || plate.replace(/[^a-z0-9]/g, '').includes(query.replace(/[^a-z0-9]/g, ''));
+          const isDriverMatch = driver.includes(query);
+          if (!isPlateMatch && !isDriverMatch) return;
+        }
+
+        matchCount++;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td><b>${highlightVehicleMatch(item.plate, vehicleSearchKeyword)}</b></td>
+          <td>${item.driver ? highlightVehicleMatch(item.driver, vehicleSearchKeyword) : '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="btn-edit-sm" onclick="startEditVehicle(${idx})">編輯</button>
+            <button class="btn-del-sm" onclick="deleteVehicleItem(${idx})">刪除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const countEl = document.getElementById("mgrVehicleCount");
+      if (countEl) {
+        countEl.textContent = query ? `${matchCount} / ${presetVehicles.length}` : presetVehicles.length;
+      }
+
+      if (matchCount === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td colspan="4" style="text-align: center; padding: 25px 10px; color: #a0aec0;">
+            🔍 找不到符合「<b>${vehicleSearchKeyword}</b>」的司機或車牌<br>
+            <button type="button" class="btn-secondary" style="margin-top: 8px; font-size: 0.8rem; padding: 4px 12px;" onclick="clearVehicleSearch()">清除搜尋</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function startEditVehicle(idx) {
+      const item = presetVehicles[idx];
+      if (!item) return;
+      document.getElementById("editVehicleIndex").value = idx;
+      document.getElementById("mgrPlate").value = item.plate;
+      document.getElementById("mgrDriver").value = item.driver || "";
+      document.getElementById("vehicleFormTitle").textContent = `✏️ 編輯車牌：${item.plate}`;
+      document.getElementById("btnCancelEdit").style.display = "inline-block";
+      const saveBtn = document.getElementById("btnSaveVehicle");
+      if (saveBtn) saveBtn.textContent = "💾 儲存修改";
+      // 自動聚焦司機姓名欄位，方便立即調整
+      document.getElementById("mgrDriver").focus();
+      document.getElementById("mgrDriver").select();
+    }
+
+    function cancelVehicleEdit() {
+      document.getElementById("editVehicleIndex").value = "-1";
+      document.getElementById("mgrPlate").value = "";
+      document.getElementById("mgrDriver").value = "";
+      document.getElementById("vehicleFormTitle").textContent = "➕ 新增司機／車牌";
+      document.getElementById("btnCancelEdit").style.display = "none";
+      const saveBtn = document.getElementById("btnSaveVehicle");
+      if (saveBtn) saveBtn.textContent = "儲存";
+    }
+
+    function saveVehicleItem() {
+      const plate = document.getElementById("mgrPlate").value.trim().toUpperCase();
+      const driver = document.getElementById("mgrDriver").value.trim();
+      const editIdx = parseInt(document.getElementById("editVehicleIndex").value, 10);
+
+      if (!plate) {
+        alert("請輸入車牌號碼！");
+        return;
+      }
+
+      if (editIdx >= 0 && editIdx < presetVehicles.length) {
+        // 修改現有名單
+        presetVehicles[editIdx] = { plate, driver };
+      } else {
+        // 新增名單 (加到最前面方便立即使用)
+        presetVehicles.unshift({ plate, driver });
+      }
+
+      savePresetVehicles();
+      renderVehicleManagerTable();
+      cancelVehicleEdit();
+    }
+
+    function deleteVehicleItem(idx) {
+      const item = presetVehicles[idx];
+      if (!item) return;
+      if (!confirm(`確定要將車牌【${item.plate}】(${item.driver || '無司機'}) 從名單中移除嗎？`)) return;
+      presetVehicles.splice(idx, 1);
+      savePresetVehicles();
+      renderVehicleManagerTable();
+    }
+
+    // ==========================================
+    // 工程 / 工地預先建檔與名單管理邏輯
+    // ==========================================
+    const STORAGE_PROJECT_KEY = 'scale_preset_projects_v2';
+    const STORAGE_REMOVED_PROJECTS_KEY = 'scale_removed_projects_v1';
+
+    function getRemovedProjects() {
+      if (window.ScaleApi && window.ScaleApi.getRemovedProjects) {
+        return window.ScaleApi.getRemovedProjects();
+      }
+      try {
+        const saved = localStorage.getItem(STORAGE_REMOVED_PROJECTS_KEY);
+        if (saved) return new Set(JSON.parse(saved));
+      } catch (e) {}
+      return new Set();
+    }
+
+    function saveRemovedProjects(set, syncToCloud = true) {
+      if (window.ScaleApi && window.ScaleApi.saveRemovedProjects) {
+        return window.ScaleApi.saveRemovedProjects(set, syncToCloud);
+      }
+      localStorage.setItem(STORAGE_REMOVED_PROJECTS_KEY, JSON.stringify(Array.from(set)));
+    }
+
+    function loadPresetProjects() {
+      try {
+        const saved = localStorage.getItem(STORAGE_PROJECT_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.error("載入自訂工程名單錯誤:", e);
+      }
+      return [];
+    }
+
+    function savePresetProjects(list) {
+      localStorage.setItem(STORAGE_PROJECT_KEY, JSON.stringify(list || presetProjects));
+    }
+
+    let presetProjects = loadPresetProjects();
+
+    function openProjectManager(focusInput = false) {
+      document.getElementById("projectModalOverlay").style.display = "flex";
+      cancelProjectEdit();
+      renderProjectManagerTable();
+      if (focusInput) {
+        setTimeout(() => {
+          document.getElementById("mgrProjectName").focus();
+        }, 100);
+      }
+    }
+
+    function closeProjectManager() {
+      document.getElementById("projectModalOverlay").style.display = "none";
+    }
+
+    function closeProjectManagerIfOutside(e) {
+      if (e.target.id === "projectModalOverlay") {
+        closeProjectManager();
+      }
+    }
+
+    function renderProjectManagerTable() {
+      const tbody = document.getElementById("mgrProjectTableBody");
+      tbody.innerHTML = "";
+
+      // 匯總已出車數統計
+      const countsMap = new Map();
+      (currentRecords || []).forEach(r => {
+        if (r.plate === '__SET__') return;
+        const p = (r.project || "").trim();
+        if (p) countsMap.set(p, (countsMap.get(p) || 0) + 1);
+      });
+
+      document.getElementById("mgrProjectCount").textContent = presetProjects.length;
+
+      presetProjects.forEach((item, idx) => {
+        const pName = item.name || "";
+        const curCount = countsMap.get(pName) || 0;
+        const target = item.target || getProjectTarget(pName) || 0;
+        const wait = item.wait || getProjectWaitPhone(pName) || "";
+        const isActive = (activeProject === pName);
+
+        const tr = document.createElement("tr");
+        if (isActive) {
+          tr.style.backgroundColor = "#ebf8ff";
+        }
+
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>
+            <b style="color:#0052cc;">${pName}</b>
+            ${isActive ? '<span style="background:#0052cc; color:#fff; font-size:0.72rem; padding:1px 5px; border-radius:4px; margin-left:4px;">當前</span>' : ''}
+          </td>
+          <td>${item.customer || '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td>${item.material || '<span style="color:#a0aec0;">(未設定)</span>'}</td>
+          <td>${target > 0 ? `<b>${target}</b> 噸` : '<span style="color:#a0aec0;">-</span>'}</td>
+          <td>${wait ? `<span style="color:#d69e2e; font-weight:600;">📞 ${wait}</span>` : '<span style="color:#a0aec0;">-</span>'}</td>
+          <td style="text-align: center;"><span class="project-tab-count">${curCount} 車</span></td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="btn-primary" style="padding: 3px 8px; font-size: 0.78rem; margin-right: 4px;" onclick="selectProjectFromManager(${idx})">🚀 切換</button>
+            <button class="btn-edit-sm" onclick="startEditProject(${idx})">編輯</button>
+            <button class="btn-del-sm" onclick="deleteProjectItem(${idx})">刪除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // 顯示已被封存/移除的工地名單，供使用者一鍵恢復
+      const removedProjects = getRemovedProjects();
+      const removedContainer = document.getElementById("mgrRemovedContainer");
+      if (removedContainer) {
+        if (removedProjects.size > 0) {
+          removedContainer.style.display = "block";
+          const listEl = document.getElementById("mgrRemovedList");
+          listEl.innerHTML = "";
+          removedProjects.forEach(pName => {
+            const tag = document.createElement("span");
+            tag.style = "display:inline-flex; align-items:center; background:#edf2f7; border:1px solid #cbd5e0; padding:2px 8px; border-radius:6px; margin:4px 6px 4px 0; font-size:0.8rem; color:#4a5568;";
+            tag.innerHTML = `<span>🗑️ ${pName}</span><button type="button" style="margin-left:6px; background:none; border:none; color:#2b6cb0; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="恢復此工地">↩️ 恢復</button>`;
+            tag.querySelector("button").onclick = () => restoreRemovedProject(pName);
+            listEl.appendChild(tag);
+          });
+        } else {
+          removedContainer.style.display = "none";
+        }
+      }
+    }
+
+    function restoreRemovedProject(pName) {
+      if (!pName) return;
+      const removedProjects = getRemovedProjects();
+      removedProjects.delete(pName);
+      saveRemovedProjects(removedProjects, true);
+      // 若尚未在 presetProjects 中，加回
+      if (!presetProjects.some(p => p.name === pName)) {
+        presetProjects.push({
+          name: pName,
+          customer: localStorage.getItem('scale_customer_' + pName) || "",
+          material: localStorage.getItem('scale_material_' + pName) || "",
+          target: getProjectTarget(pName) || 0,
+          wait: getProjectWaitPhone(pName) || ""
+        });
+        savePresetProjects();
+      }
+      debouncedSyncProjectSettings(pName);
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+      renderTable();
+    }
+
+    function startEditProject(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      document.getElementById("editProjectIndex").value = idx;
+      document.getElementById("editProjectOldName").value = item.name;
+      document.getElementById("mgrProjectName").value = item.name;
+      document.getElementById("mgrProjectCustomer").value = item.customer || "";
+      document.getElementById("mgrProjectMaterial").value = item.material || "";
+      const t = item.target || getProjectTarget(item.name) || "";
+      document.getElementById("mgrProjectTarget").value = t > 0 ? t : "";
+      document.getElementById("mgrProjectWaitPhone").value = item.wait || getProjectWaitPhone(item.name) || "";
+      
+      document.getElementById("projectFormTitle").textContent = `✏️ 編輯工程／工地：${item.name}`;
+      document.getElementById("btnCancelProjectEdit").style.display = "inline-block";
+      const saveBtn = document.getElementById("btnSaveProject");
+      if (saveBtn) saveBtn.textContent = "💾 儲存修改";
+      document.getElementById("mgrProjectName").focus();
+    }
+
+    function cancelProjectEdit() {
+      document.getElementById("editProjectIndex").value = "-1";
+      document.getElementById("editProjectOldName").value = "";
+      document.getElementById("mgrProjectName").value = "";
+      document.getElementById("mgrProjectCustomer").value = document.getElementById("customer").value || "高雄市政府";
+      document.getElementById("mgrProjectMaterial").value = document.getElementById("material").value || "1/2密集配";
+      document.getElementById("mgrProjectTarget").value = "";
+      document.getElementById("mgrProjectWaitPhone").value = "";
+      document.getElementById("projectFormTitle").textContent = "➕ 預先建檔新工程／工地";
+      document.getElementById("btnCancelProjectEdit").style.display = "none";
+      const saveBtn = document.getElementById("btnSaveProject");
+      if (saveBtn) saveBtn.textContent = "💾 儲存建檔";
+    }
+
+    async function saveProjectItem() {
+      try {
+        const name = document.getElementById("mgrProjectName").value.trim();
+        const customer = document.getElementById("mgrProjectCustomer").value.trim();
+        const material = document.getElementById("mgrProjectMaterial").value.trim();
+        const rawTarget = document.getElementById("mgrProjectTarget").value.trim();
+        const target = parseFloat(rawTarget) || 0;
+        const wait = document.getElementById("mgrProjectWaitPhone").value.trim();
+        const editIdx = parseInt(document.getElementById("editProjectIndex").value, 10);
+        const oldName = document.getElementById("editProjectOldName").value.trim();
+
+        if (!name) {
+          alert("請輸入工程名稱 / 地點！");
+          document.getElementById("mgrProjectName").focus();
+          return;
+        }
+
+        // 檢查是否與其他既有工程同名
+        const duplicateIdx = presetProjects.findIndex((p, i) => p.name === name && i !== editIdx);
+        if (duplicateIdx !== -1) {
+          alert(`工程名稱【${name}】已存在，請勿重複命名！`);
+          document.getElementById("mgrProjectName").focus();
+          return;
+        }
+
+        const projectData = { name, customer, material, target, wait };
+        const isEditing = (editIdx >= 0 && editIdx < presetProjects.length);
+
+        if (isEditing) {
+          presetProjects[editIdx] = projectData;
+
+          // 若工程名稱有更動，連動更新舊有紀錄與相關快取
+          if (oldName && oldName !== name) {
+            localStorage.removeItem('scale_customer_' + oldName);
+            localStorage.removeItem('scale_material_' + oldName);
+            localStorage.removeItem('scale_target_' + oldName);
+            localStorage.removeItem('scale_wait_phone_' + oldName);
+
+            // 更新記憶體中 currentRecords 的歷史過磅資料工地名稱
+            (currentRecords || []).forEach(r => {
+              if (r.project === oldName) {
+                r.project = name;
+                // 同步將雲端歷史紀錄更新為新工程名稱
+                if (window.ScaleApi && r.plate !== '__SET__') {
+                  window.ScaleApi.postAction('updateDispatch', { ...r, project: name }).catch(async (e) => {
+                    try {
+                      await window.ScaleApi.postAction('deleteDispatch', { id: r.id });
+                      await window.ScaleApi.postAction('addDispatch', { ...r, project: name });
+                    } catch (err2) {}
+                  });
+                }
+              }
+            });
+
+            // 處理舊名稱對應的 __SET__ 雲端設定紀錄 (改名或刪除舊設定)
+            const oldSetRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === oldName);
+            oldSetRecords.forEach(r => {
+              r.customer = name;
+              if (window.ScaleApi) {
+                window.ScaleApi.postAction('updateDispatch', {
+                  id: r.id,
+                  customer: name,
+                  project: '__SETTINGS__',
+                  material: JSON.stringify({ target, wait, customer, material }),
+                  driver: '-',
+                  plate: '__SET__',
+                  weight: 1,
+                  exit_time: '-'
+                }).catch(e => console.warn('更新舊工程雲端設定名失敗:', e));
+              }
+            });
+
+            // 標記舊名稱已移除，並同步雲端避免手機/唯讀版顯示舊名稱
+            const removedProjects = getRemovedProjects();
+            removedProjects.add(oldName);
+            saveRemovedProjects(removedProjects, true);
+
+            if (activeProject === oldName) activeProject = name;
+          }
+        } else {
+          // 新增建檔 (排在最前面)
+          presetProjects.unshift(projectData);
+          // 若之前曾被刪除過，重新加入並同步至雲端
+          const removedProjects = getRemovedProjects();
+          removedProjects.delete(name);
+          saveRemovedProjects(removedProjects, true);
+        }
+
+        // 存入 localStorage
+        savePresetProjects();
+
+        // 設定各別項目快取與目標噸數、等電話
+        if (customer) localStorage.setItem('scale_customer_' + name, customer);
+        else localStorage.removeItem('scale_customer_' + name);
+
+        if (material) localStorage.setItem('scale_material_' + name, material);
+        else localStorage.removeItem('scale_material_' + name);
+
+        if (target > 0) {
+          localStorage.setItem('scale_target_' + name, target);
+        } else {
+          localStorage.removeItem('scale_target_' + name);
+        }
+
+        if (wait) {
+          localStorage.setItem('scale_wait_phone_' + name, wait);
+        } else {
+          localStorage.removeItem('scale_wait_phone_' + name);
+        }
+
+        // 同步設定到雲端 __SET__ 記錄
+        debouncedSyncProjectSettings(name);
+
+        // 更新 knownProjects 與頂部分頁
+        updateKnownProjects();
+        renderProjectTabs();
+        renderProjectManagerTable();
+        cancelProjectEdit();
+
+        // 切換到該工地
+        switchProjectTab(name);
+
+        // 提示反饋
+        setTimeout(() => {
+          if (isEditing) {
+            alert(`✅ 工程【${name}】設定已成功更新儲存！`);
+          } else {
+            alert(`✅ 工程【${name}】已成功建檔！\n頂部已新增該工地分頁。\n您可以繼續預建下一個工地，或點右上角✕開始出車。`);
+          }
+        }, 50);
+
+      } catch (err) {
+        console.error("儲存工程建檔失敗:", err);
+        alert("儲存工程失敗: " + err.message);
+      }
+    }
+
+    function selectProjectFromManager(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      switchProjectTab(item.name);
+      closeProjectManager();
+    }
+
+    async function deleteProjectItem(idx) {
+      const item = presetProjects[idx];
+      if (!item) return;
+      if (!confirm(`確定要將工程地點【${item.name}】從名單中移除嗎？\n(注意：已出車之歷史資料仍會保留)`)) return;
+      
+      const pName = item.name;
+      presetProjects.splice(idx, 1);
+      savePresetProjects();
+
+      // 標記已從清單中移除，並同步雲端讓手機/唯讀版也同步移除
+      const removedProjects = getRemovedProjects();
+      removedProjects.add(pName);
+      saveRemovedProjects(removedProjects, true);
+
+      // 清除本地儲存
+      localStorage.removeItem('scale_customer_' + pName);
+      localStorage.removeItem('scale_material_' + pName);
+      localStorage.removeItem('scale_target_' + pName);
+      localStorage.removeItem('scale_wait_phone_' + pName);
+
+      // 同步清理雲端 __SET__ 記錄 (若存在)
+      const setRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+      setRecords.forEach(r => {
+        if (window.ScaleApi) {
+          window.ScaleApi.postAction('deleteDispatch', { id: r.id }).catch(e => console.warn('刪除雲端設定記錄失敗:', e));
+        }
+      });
+      currentRecords = (currentRecords || []).filter(r => !(r.plate === '__SET__' && r.customer === pName));
+
+      if (activeProject === pName) {
+        activeProject = "";
+        localStorage.removeItem('scale_active_project');
+      }
+
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+      renderTable();
+    }
+
+    function onPlateInput(val) {
+      const keyword = (val || "").trim().toUpperCase();
+      const dropdown = document.getElementById("plateDropdown");
+      const matches = presetVehicles.filter(v => {
+        if (!keyword) return true;
+        return v.plate.replace('-', '').includes(keyword) || v.plate.includes(keyword);
+      });
+      if (matches.length === 0) { dropdown.style.display = "none"; return; }
+
+      dropdown.innerHTML = "";
+      matches.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<span>${item.plate}</span><span style="color:#718096">${item.driver || ''}</span>`;
+        div.onmousedown = (e) => { e.preventDefault(); }; // 防止 blur
+        div.onclick = () => {
+          document.getElementById("plate").value = item.plate;
+          if (item.driver) document.getElementById("driver").value = item.driver;
+          dropdown.style.display = "none";
+          document.getElementById("weight").focus();
+        };
+        dropdown.appendChild(div);
+      });
+      dropdown.style.display = "block";
+    }
+
+    function onDriverInput(val) {
+      const keyword = (val || "").trim();
+      const dropdown = document.getElementById("driverDropdown");
+      const matches = presetVehicles.filter(v => v.driver && (v.driver.includes(keyword) || !keyword));
+      if (matches.length === 0) { dropdown.style.display = "none"; return; }
+
+      dropdown.innerHTML = "";
+      matches.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "autocomplete-item";
+        div.innerHTML = `<span><b>${item.driver}</b></span><span style="color:#718096">${item.plate}</span>`;
+        div.onmousedown = (e) => { e.preventDefault(); }; // 防止 blur
+        div.onclick = () => {
+          document.getElementById("driver").value = item.driver;
+          if (item.plate) document.getElementById("plate").value = item.plate;
+          dropdown.style.display = "none";
+          document.getElementById("weight").focus();
+        };
+        dropdown.appendChild(div);
+      });
+      dropdown.style.display = "block";
+    }
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest('.autocomplete-wrap')) {
+        document.getElementById("plateDropdown").style.display = "none";
+        document.getElementById("driverDropdown").style.display = "none";
+      }
+    });
+
+    // 智能時間輸入：純數字自動補上冒號 (例如 1158 -> 11:58，或 930 -> 09:30)
+    function formatTimeInput(input) {
+      let val = input.value.replace(/[^0-9]/g, '');
+      if (val.length > 4) val = val.slice(0, 4);
+      if (val.length >= 3) {
+        input.value = val.slice(0, val.length - 2) + ':' + val.slice(val.length - 2);
+      } else {
+        input.value = val;
+      }
+    }
+
+    function autoFormatTime(input) {
+      let val = input.value.replace(/[^0-9]/g, '');
+      if (!val) return;
+      if (val.length === 1) val = '0' + val + '00';
+      else if (val.length === 2) val = val + '00';
+      else if (val.length === 3) val = '0' + val;
+      const hh = val.slice(0, 2);
+      const mm = val.slice(2, 4);
+      input.value = `${hh}:${mm}`;
+    }
+
+    // 隨車物品下拉與標籤快選處理
+    function applyCargoSelect(val) {
+      if (!val) return;
+      const input = document.getElementById("cargo_notes");
+      const current = input.value.trim();
+      if (!current) {
+        input.value = val;
+      } else if (!current.includes(val)) {
+        input.value = current + '、' + val;
+      }
+      document.getElementById("cargoQuickSelect").value = "";
+      input.focus();
+    }
+
+    function addCargoTag(tag) {
+      const input = document.getElementById("cargo_notes");
+      const current = input.value.trim();
+      if (!current) {
+        input.value = tag;
+      } else if (!current.includes(tag)) {
+        input.value = current + '、' + tag;
+      }
+      input.focus();
+    }
+
+    function clearCargoTags() {
+      document.getElementById("cargo_notes").value = "";
+      document.getElementById("cargoQuickSelect").value = "";
+    }
+
+    const STORAGE_RECORDS_CACHE_KEY = 'scale_records_cache_v1';
+    function loadCachedRecords() {
+      try {
+        const cached = localStorage.getItem(STORAGE_RECORDS_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+      return [];
+    }
+
+    function saveCachedRecords(records) {
+      try {
+        localStorage.setItem(STORAGE_RECORDS_CACHE_KEY, JSON.stringify(records || []));
+      } catch (e) {}
+    }
+
+    let currentRecords = loadCachedRecords();
+    let activeProject = "";
+    let knownProjects = new Map(); // project -> { customer, material, count }
+    let editingDispatchId = null; // 當前正在編輯的車次 ID
+
+    function initApiConfig() {
+      const input = document.getElementById("apiServerInput");
+      const current = window.ScaleApi ? window.ScaleApi.getBaseUrl() : '';
+      input.value = current;
+      if (current) {
+        document.getElementById("apiStatusText").textContent = '連線至: ' + current;
+      }
+    }
+
+    function toggleServerBar() {
+      const bar = document.getElementById("serverSettingBar");
+      if (!bar) return;
+      bar.style.display = (bar.style.display === "flex") ? "none" : "flex";
+    }
+
+    function saveApiServer() {
+      const val = document.getElementById("apiServerInput").value.trim();
+      if (window.ScaleApi) {
+        window.ScaleApi.setBaseUrl(val);
+        document.getElementById("apiStatusText").textContent = val ? '已設定連線至: ' + val : '已恢復為本機/同源 API';
+        loadRecords();
+      }
+    }
+
+    function updateKnownProjects() {
+      knownProjects.clear();
+      const removedProjects = getRemovedProjects();
+
+      // 1. 先將預先建檔名單中的工程納入
+      presetProjects.forEach(item => {
+        const pName = (item.name || "").trim();
+        if (pName && !removedProjects.has(pName) && !knownProjects.has(pName)) {
+          const cust = item.customer || localStorage.getItem('scale_customer_' + pName) || "";
+          const mat = item.material || localStorage.getItem('scale_material_' + pName) || "";
+          knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
+        }
+      });
+
+      // 2. 從已有歷史資料匯整出現過的所有個別工地地點（排除 __SET__ 設定記錄）
+      currentRecords.forEach(r => {
+        if (r.plate === '__SET__') return; // 略過設定記錄
+        const pName = r.project ? r.project.trim() : "";
+        if (pName && !removedProjects.has(pName)) {
+          if (!knownProjects.has(pName)) {
+            knownProjects.set(pName, { customer: r.customer || "", material: r.material || "", count: 0 });
+          }
+          knownProjects.get(pName).count++;
+        }
+      });
+
+      // 3. 也檢查雲端 __SET__ 記錄中是否有設定過的案場
+      currentRecords.forEach(r => {
+        if (r.plate === '__SET__' && r.customer) {
+          const pName = r.customer.trim();
+          if (pName && pName !== '__PROJECT_CONFIG__' && !removedProjects.has(pName) && !knownProjects.has(pName)) {
+            const cust = localStorage.getItem('scale_customer_' + pName) || "";
+            const mat = localStorage.getItem('scale_material_' + pName) || "";
+            knownProjects.set(pName, { customer: cust, material: mat, count: 0 });
+          }
+        }
+      });
+
+      // 4. 如果當前表單有設定工程，且尚未在清單中 (且未被標記移除)
+      const formP = document.getElementById("project").value.trim();
+      const formC = document.getElementById("customer").value.trim();
+      const formM = document.getElementById("material").value.trim();
+      if (formP && !removedProjects.has(formP) && !knownProjects.has(formP)) {
+        knownProjects.set(formP, { customer: formC, material: formM, count: 0 });
+      }
+
+      // 檢查是否有前次保留的 activeProject
+      const savedActive = localStorage.getItem('scale_active_project');
+      if (savedActive && knownProjects.has(savedActive)) {
+        activeProject = savedActive;
+      }
+
+      // 如果尚未選定 activeProject 或當前 activeProject 不存在於個別工地清單中，自動選取第一個個別工地
+      if (!activeProject || !knownProjects.has(activeProject)) {
+        const firstKey = knownProjects.keys().next().value;
+        if (firstKey) {
+          activeProject = firstKey;
+        }
+      }
+
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        document.getElementById("project").value = activeProject;
+        const savedC = localStorage.getItem('scale_customer_' + activeProject);
+        const savedM = localStorage.getItem('scale_material_' + activeProject);
+        const cust = savedC || meta.customer;
+        const mat = savedM || meta.material;
+        if (cust) document.getElementById("customer").value = cust;
+        if (mat) document.getElementById("material").value = mat;
+      }
+    }
+
+    function renderProjectTabs() {
+      const container = document.getElementById("projectTabsContainer");
+      container.innerHTML = "";
+
+      // 依使用者需求：不再顯示「全部地點/全部車次」，僅呈現各個個別工地分頁
+      knownProjects.forEach((meta, pName) => {
+        const btn = document.createElement("button");
+        btn.className = "project-tab-btn" + (activeProject === pName ? " active" : "");
+        btn.innerHTML = `<span>📍 ${pName}</span><span class="project-tab-count">${meta.count} 車</span>`;
+        btn.onclick = () => switchProjectTab(pName);
+        container.appendChild(btn);
+      });
+
+      // 快速分享當前案場連結按鈕
+      if (activeProject && knownProjects.has(activeProject)) {
+        const shareBtn = document.createElement("button");
+        shareBtn.className = "project-tab-btn";
+        shareBtn.style.borderColor = "#38a169";
+        shareBtn.style.color = "#276749";
+        shareBtn.innerHTML = `<span>📋 複製此工地主任專用連結</span>`;
+        shareBtn.onclick = copyProjectShareLink;
+        container.appendChild(shareBtn);
+      }
+    }
+
+    function getProjectTarget(pName) {
+      if (!pName) return 0;
+      const val = localStorage.getItem('scale_target_' + pName);
+      return val ? parseFloat(val) : 0;
+    }
+
+    function setSyncStatusBadge(status, text) {
+      const badge = document.getElementById("projectSyncBadge");
+      if (!badge) return;
+      badge.style.display = "inline-block";
+      if (status === 'syncing') {
+        badge.style.background = "#feebc8";
+        badge.style.color = "#c05621";
+        badge.innerHTML = `⏳ ${text || '雲端同步中...'}`;
+      } else if (status === 'synced') {
+        badge.style.background = "#c6f6d5";
+        badge.style.color = "#22543d";
+        badge.innerHTML = `☁️ ${text || '雲端已同步'}`;
+      } else if (status === 'error') {
+        badge.style.background = "#fed7d7";
+        badge.style.color = "#9b2c2c";
+        badge.innerHTML = `⚠️ ${text || '同步失敗'}`;
+      }
+    }
+
+    function setProjectTarget(pName, val) {
+      if (!pName) return;
+      const num = parseFloat(val);
+      if (!isNaN(num) && num > 0) {
+        localStorage.setItem('scale_target_' + pName, num);
+      } else {
+        localStorage.removeItem('scale_target_' + pName);
+      }
+      updateDemandStatus();
+      debouncedSyncProjectSettings(pName);
+    }
+
+    let syncSettingsTimer = null;
+    let isSyncingSettings = false;
+    let pendingSyncProjects = new Set();
+
+    function debouncedSyncProjectSettings(pName) {
+      if (!pName) return;
+      pendingSyncProjects.add(pName);
+      setSyncStatusBadge('syncing', '正在儲存...');
+      if (syncSettingsTimer) clearTimeout(syncSettingsTimer);
+      syncSettingsTimer = setTimeout(async () => {
+        await processPendingSyncProjects();
+      }, 500);
+    }
+
+    async function processPendingSyncProjects() {
+      if (isSyncingSettings || pendingSyncProjects.size === 0) return;
+      isSyncingSettings = true;
+      try {
+        while (pendingSyncProjects.size > 0) {
+          const pName = pendingSyncProjects.values().next().value;
+          pendingSyncProjects.delete(pName);
+          await syncProjectSettingsToCloud(pName);
+        }
+      } finally {
+        isSyncingSettings = false;
+        if (pendingSyncProjects.size > 0) {
+          processPendingSyncProjects();
+        }
+      }
+    }
+
+    // 同步工程設定（目標噸數 + 等電話車數 + 客戶 + 料別）至 Google Sheets 的特殊記錄，讓手機端也能讀取
+    async function syncProjectSettingsToCloud(pName) {
+      if (!pName || !window.ScaleApi || pName === '__PROJECT_CONFIG__') return;
+      const target = getProjectTarget(pName) || 0;
+      const waitPhone = getProjectWaitPhone(pName) || '';
+      const meta = knownProjects.get(pName) || {};
+      const cust = localStorage.getItem('scale_customer_' + pName) || meta.customer || '';
+      const mat = localStorage.getItem('scale_material_' + pName) || meta.material || '';
+      const settingJson = JSON.stringify({ target, wait: waitPhone, customer: cust, material: mat });
+      try {
+        const existingList = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+        const existing = existingList[0];
+        const payload = {
+          customer: pName, project: '__SETTINGS__',
+          material: settingJson, driver: '-',
+          plate: '__SET__', weight: 1, exit_time: '-'
+        };
+        if (existing) {
+          payload.id = existing.id;
+          await window.ScaleApi.postAction('updateDispatch', payload);
+          existing.material = settingJson;
+        } else {
+          const res = await window.ScaleApi.postAction('addDispatch', payload);
+          if (res && res.success && res.data && currentRecords) {
+            currentRecords.push(res.data);
+          }
+        }
+        setSyncStatusBadge('synced', '已同步至雲端');
+      } catch (err) {
+        console.warn('工程設定同步失敗 (不影響本機操作):', err);
+        setSyncStatusBadge('error', '雲端同步異常');
+      }
+    }
+
+    function onCustomerFormInput(val) {
+      const clean = (val || "").trim();
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        meta.customer = clean;
+      }
+      if (activeProject) {
+        localStorage.setItem('scale_customer_' + activeProject, clean);
+      }
+    }
+
+    function onMaterialFormInput(val) {
+      const clean = (val || "").trim();
+      if (activeProject && knownProjects.has(activeProject)) {
+        const meta = knownProjects.get(activeProject);
+        meta.material = clean;
+      }
+      if (activeProject) {
+        localStorage.setItem('scale_material_' + activeProject, clean);
+      }
+    }
+
+    function onProjectFormInput(val) {
+      const clean = (val || "").trim();
+      if (!clean) return;
+      if (!knownProjects.has(clean)) {
+        const cVal = document.getElementById("customer").value.trim();
+        const mVal = document.getElementById("material").value.trim();
+        knownProjects.set(clean, { customer: cVal, material: mVal, count: 0 });
+      }
+      activeProject = clean;
+      localStorage.setItem('scale_active_project', clean);
+      const tVal = getProjectTarget(clean);
+      const targetInput = document.getElementById("projectTarget");
+      if (targetInput && document.activeElement !== targetInput) {
+        targetInput.value = tVal > 0 ? tVal : "";
+      }
+      const wVal = getProjectWaitPhone(clean);
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      if (waitPhoneInput && document.activeElement !== waitPhoneInput) {
+        waitPhoneInput.value = wVal;
+      }
+      updateDemandStatus();
+      renderProjectTabs();
+      renderTable();
+    }
+
+    // 當使用者在「預計總量 (噸)」輸入時：即時聯動推算「還要出 (噸)」與下方狀態列
+    function onTargetInput(val) {
+      if (!activeProject) return;
+      const cleanVal = (val || "").trim();
+      const num = parseFloat(cleanVal);
+      const remainingInput = document.getElementById("projectRemainingInput");
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      if (!isNaN(num) && num >= 0) {
+        localStorage.setItem('scale_target_' + activeProject, num);
+        // 同步更新「還要出」欄位（若使用者當前未在還要出欄位打字）
+        if (remainingInput && document.activeElement !== remainingInput) {
+          const rem = Math.max(0, Math.round((num - currentTon) * 100) / 100);
+          remainingInput.value = rem;
+        }
+      } else {
+        localStorage.removeItem('scale_target_' + activeProject);
+        if (remainingInput && document.activeElement !== remainingInput) {
+          remainingInput.value = "";
+        }
+      }
+
+      updateDemandStatus();
+      debouncedSyncProjectSettings(activeProject);
+    }
+
+    // 當使用者直接在「還要出多少 (噸)」手 key 時：自動聯動反推「預計需求總量」= 當前已出噸數 + 還要出的噸數
+    function onRemainingInput(val) {
+      if (!activeProject) return;
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      const cleanVal = (val || "").trim();
+      const remNum = parseFloat(cleanVal);
+      const targetInput = document.getElementById("projectTarget");
+
+      if (!isNaN(remNum) && remNum >= 0) {
+        const calculatedTarget = Math.round((currentTon + remNum) * 100) / 100;
+        localStorage.setItem('scale_target_' + activeProject, calculatedTarget);
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = calculatedTarget;
+        }
+      } else if (!cleanVal) {
+        localStorage.removeItem('scale_target_' + activeProject);
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = "";
+        }
+      }
+
+      updateDemandStatus();
+      debouncedSyncProjectSettings(activeProject);
+    }
+
+    function setTargetPrompt() {
+      if (!activeProject) {
+        alert("請先選擇或輸入工程地點！");
+        return;
+      }
+      const current = getProjectTarget(activeProject);
+      const val = prompt(`請輸入【${activeProject}】預計需求總量 (噸)：`, current || "600");
+      if (val !== null) {
+        const num = parseFloat(val);
+        const targetInput = document.getElementById("projectTarget");
+        if (targetInput) targetInput.value = (!isNaN(num) && num > 0) ? num : "";
+        setProjectTarget(activeProject, val);
+      }
+    }
+
+    function getProjectWaitPhone(pName) {
+      if (!pName) return "";
+      return localStorage.getItem('scale_wait_phone_' + pName) || "";
+    }
+
+    function setProjectWaitPhone(pName, val) {
+      if (!pName) return;
+      const clean = (val || "").trim();
+      if (clean) {
+        localStorage.setItem('scale_wait_phone_' + pName, clean);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + pName);
+      }
+      updateDemandStatus();
+      debouncedSyncProjectSettings(pName);
+    }
+
+    function onWaitPhoneInput(val) {
+      if (!activeProject) return;
+      setProjectWaitPhone(activeProject, val);
+    }
+
+    function applyWaitPhoneSelect(val) {
+      if (!activeProject) return;
+      const targetVal = (val === 'CLEAR') ? '' : val;
+      const input = document.getElementById("projectWaitPhoneInput");
+      if (input) input.value = targetVal;
+      setProjectWaitPhone(activeProject, targetVal);
+      const select = document.getElementById("waitPhoneQuickSelect");
+      if (select) select.value = "";
+    }
+
+    function applyWaitPhoneTag(tag) {
+      if (!activeProject) return;
+      const input = document.getElementById("projectWaitPhoneInput");
+      if (input) input.value = tag;
+      setProjectWaitPhone(activeProject, tag);
+    }
+
+    function updateDemandStatus() {
+      const statusBox = document.getElementById("projectDemandStatus");
+      if (!activeProject) {
+        statusBox.style.display = "none";
+        return;
+      }
+
+      // 計算當前工地出貨累計（排除 __SET__ 設定記錄）
+      const siteRecords = currentRecords.filter(r => r.project === activeProject && r.plate !== '__SET__');
+      const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+      const currentTon = totalKg / 1000;
+
+      const targetTon = getProjectTarget(activeProject);
+      const waitPhone = getProjectWaitPhone(activeProject);
+      const targetInput = document.getElementById("projectTarget");
+      const remainingInput = document.getElementById("projectRemainingInput");
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      const waitPhoneBadge = document.getElementById("dispWaitPhoneBadge");
+
+      if (waitPhoneInput && document.activeElement !== waitPhoneInput) {
+        waitPhoneInput.value = waitPhone;
+      }
+
+      if (waitPhoneBadge) {
+        if (waitPhone) {
+          waitPhoneBadge.textContent = `📞 ${waitPhone}`;
+          waitPhoneBadge.style.display = "inline-block";
+        } else {
+          waitPhoneBadge.style.display = "none";
+        }
+      }
+
+      document.getElementById("dispCurrentTon").textContent = currentTon.toFixed(2);
+
+      if (targetTon > 0) {
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = targetTon;
+        }
+        const remainingTon = Math.max(0, Math.round((targetTon - currentTon) * 100) / 100);
+        if (remainingInput && document.activeElement !== remainingInput) {
+          remainingInput.value = remainingTon > 0 ? remainingTon : "0";
+        }
+        
+        // 估計平均每車重量推算還需幾車
+        let avgPerTruck = siteRecords.length > 0 ? (currentTon / siteRecords.length) : 21.0;
+        if (avgPerTruck <= 0) avgPerTruck = 21.0;
+        const estTrucks = remainingTon > 0 ? Math.ceil(remainingTon / avgPerTruck) : 0;
+
+        document.getElementById("dispTargetTon").textContent = targetTon.toFixed(1);
+        
+        const remEl = document.getElementById("dispRemainingTon");
+        if (remainingTon <= 0) {
+          remEl.textContent = "0.00 (已達標)";
+          remEl.style.color = "#38a169";
+          document.getElementById("dispRemainingTrucks").textContent = "🎉 出貨完畢";
+        } else {
+          remEl.textContent = remainingTon.toFixed(2);
+          remEl.style.color = "#c53030";
+          document.getElementById("dispRemainingTrucks").textContent = `約需再出 ${estTrucks} 車 (以每車約 ${avgPerTruck.toFixed(1)} 噸計)`;
+        }
+        statusBox.style.display = "flex";
+      } else {
+        if (targetInput && document.activeElement !== targetInput) {
+          targetInput.value = "";
+        }
+        if (remainingInput && document.activeElement !== remainingInput) {
+          remainingInput.value = "";
+        }
+        document.getElementById("dispTargetTon").textContent = "0.0";
+        document.getElementById("dispRemainingTon").textContent = "0.00";
+        document.getElementById("dispRemainingTrucks").textContent = "尚未設定需求量";
+        statusBox.style.display = "flex";
+      }
+    }
+
+    function switchProjectTab(pName) {
+      activeProject = pName;
+      if (pName) localStorage.setItem('scale_active_project', pName);
+      if (knownProjects.has(pName)) {
+        const meta = knownProjects.get(pName);
+        document.getElementById("project").value = pName;
+        const savedC = localStorage.getItem('scale_customer_' + pName);
+        const savedM = localStorage.getItem('scale_material_' + pName);
+        const cust = savedC || meta.customer;
+        const mat = savedM || meta.material;
+        if (cust) document.getElementById("customer").value = cust;
+        if (mat) document.getElementById("material").value = mat;
+      }
+      const tVal = getProjectTarget(pName);
+      const targetInput = document.getElementById("projectTarget");
+      if (targetInput) targetInput.value = tVal > 0 ? tVal : "";
+      const wVal = getProjectWaitPhone(pName);
+      const waitPhoneInput = document.getElementById("projectWaitPhoneInput");
+      if (waitPhoneInput) waitPhoneInput.value = wVal;
+      updateDemandStatus();
+      renderProjectTabs();
+      renderTable();
+    }
+
+    function addNewProjectPrompt() {
+      const newName = prompt("請輸入新的工程名稱 / 地點：", "小港區沿海路");
+      if (!newName || !newName.trim()) return;
+      const cleanName = newName.trim();
+      const newCustomer = prompt("請輸入該案場的客戶名稱：", document.getElementById("customer").value || "高雄市政府") || "高雄市政府";
+      const newMaterial = prompt("請輸入該案場的料別：", document.getElementById("material").value || "1/2密集配") || "1/2密集配";
+      const newTarget = prompt("請輸入該工程預計需求量 (噸，可留空稍後設定)：", "");
+      const newWait = prompt("是否有等電話車數？(如: 2台等電話，可留空)：", "");
+      
+      knownProjects.set(cleanName, { customer: newCustomer.trim(), material: newMaterial.trim(), count: 0 });
+      if (newTarget && parseFloat(newTarget) > 0) {
+        setProjectTarget(cleanName, parseFloat(newTarget));
+      }
+      if (newWait && newWait.trim()) {
+        setProjectWaitPhone(cleanName, newWait.trim());
+      }
+      switchProjectTab(cleanName);
+    }
+
+    function copyProjectShareLink() {
+      if (activeProject === "全部地點") return;
+      const baseUrl = window.location.href.split('?')[0].replace('index.html', 'view.html');
+      let shareUrl = `${baseUrl}?project=${encodeURIComponent(activeProject)}`;
+      const targetTon = getProjectTarget(activeProject);
+      if (targetTon > 0) {
+        shareUrl += `&target=${targetTon}`;
+      }
+      const waitPhone = getProjectWaitPhone(activeProject);
+      if (waitPhone) {
+        shareUrl += `&wait=${encodeURIComponent(waitPhone)}`;
+      }
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        const details = [];
+        if (targetTon > 0) details.push(`預計需求：${targetTon} 噸`);
+        if (waitPhone) details.push(`調度狀態：${waitPhone}`);
+        const extra = details.length > 0 ? `\n(${details.join('，')})` : '';
+        alert(`已成功複製【${activeProject}】專屬主任連結：\n\n${shareUrl}${extra}\n\n傳給工地主任，手機點開即可直接看到已出數量、還要出多少與等電話通知！`);
+      }).catch(() => {
+        prompt("請複製此連結傳給該工地主任：", shareUrl);
+      });
+    }
+
+    async function loadRecords() {
+      try {
+        currentRecords = await window.ScaleApi.fetchDispatches();
+        const removedProjects = getRemovedProjects();
+
+        // 讀取隱藏在 __SET__ 記錄中的工程設定並同步至 localStorage 與預先建檔清單
+        currentRecords.filter(r => r.plate === '__SET__').forEach(r => {
+          try {
+            const pName = (r.customer || '').trim();
+            if (!pName || pName === '__PROJECT_CONFIG__') return;
+            if (removedProjects.has(pName)) {
+              // 若此工程先前已被移除或改名，則忽略該過時設定
+              return;
+            }
+            const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            
+            if (cfg.customer) localStorage.setItem('scale_customer_' + pName, cfg.customer);
+            if (cfg.material) localStorage.setItem('scale_material_' + pName, cfg.material);
+
+            // 若當前有該工程尚未同步至雲端的本機異動，不被雲端舊值覆蓋
+            if (!pendingSyncProjects.has(pName)) {
+              if (cfg.target > 0) {
+                localStorage.setItem('scale_target_' + pName, cfg.target);
+              } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
+                // 保持乾淨
+              }
+              if (cfg.wait) {
+                localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+              } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
+                localStorage.removeItem('scale_wait_phone_' + pName);
+              }
+            }
+
+            // 同步至 presetProjects 名單 (讓另一台裝置或手機/電腦也能同步看到該建檔工地)
+            let found = presetProjects.find(p => p.name === pName);
+            if (!found) {
+              found = {
+                name: pName,
+                customer: cfg.customer || localStorage.getItem('scale_customer_' + pName) || "",
+                material: cfg.material || localStorage.getItem('scale_material_' + pName) || "",
+                target: cfg.target || 0,
+                wait: cfg.wait || ""
+              };
+              presetProjects.push(found);
+              savePresetProjects();
+            } else {
+              if (cfg.target > 0) found.target = cfg.target;
+              if (cfg.wait) found.wait = cfg.wait;
+              if (cfg.customer && !found.customer) found.customer = cfg.customer;
+              if (cfg.material && !found.material) found.material = cfg.material;
+            }
+          } catch(e) {}
+        });
+
+        // 同時將已出車記錄中出現過的工程地點也納入預先建檔名單（若尚未建檔且未被使用者手動移除）
+        currentRecords.forEach(r => {
+          if (r.plate === '__SET__') return;
+          const pName = (r.project || '').trim();
+          if (pName && !removedProjects.has(pName)) {
+            let found = presetProjects.find(p => p.name === pName);
+            if (!found) {
+              presetProjects.push({
+                name: pName,
+                customer: r.customer || localStorage.getItem('scale_customer_' + pName) || "",
+                material: r.material || localStorage.getItem('scale_material_' + pName) || "",
+                target: getProjectTarget(pName) || 0,
+                wait: getProjectWaitPhone(pName) || ""
+              });
+              savePresetProjects();
+            }
+          }
+        });
+
+        // 確保本地非移除的 presetProjects 都有同步至雲端 __SET__ 記錄，供 view.html 顯示
+        presetProjects.forEach(p => {
+          if (p.name && !removedProjects.has(p.name)) {
+            const hasCloudSet = currentRecords.some(r => r.plate === '__SET__' && r.customer === p.name);
+            if (!hasCloudSet) {
+              debouncedSyncProjectSettings(p.name);
+            }
+          }
+        });
+
+        saveCachedRecords(currentRecords);
+        updateKnownProjects();
+        renderProjectTabs();
+        renderTable();
+        updateDemandStatus();
+        const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
+
+      } catch (err) {
+        console.error('讀取失敗:', err);
+        document.getElementById("apiStatusText").textContent = '連線失敗: ' + err.message;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+      let runningTotal = 0;
+
+      // 依當前選中頁籤進行工程過濾，並排除 __SET__ 設定記錄
+      const displayRecords = (activeProject === "全部地點"
+        ? currentRecords
+        : currentRecords.filter(r => r.project === activeProject)
+      ).filter(r => r.plate !== '__SET__');
+
+
+      displayRecords.forEach((r, idx) => {
+        runningTotal += r.weight;
+        const tr = document.createElement("tr");
+        if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
+          tr.className = "editing-highlight";
+        }
+        // 分離司機名稱與隨車物品獨立欄位呈現
+        const driverStr = r.driver != null ? String(r.driver) : '-';
+        let driverName = driverStr;
+        let cargoHtml = '<span style="color:#a0aec0;">-</span>';
+        if (driverStr && (driverStr.includes("  ") || driverStr.includes("    "))) {
+          const parts = driverStr.split(/\s{2,}/);
+          driverName = parts[0];
+          const cargoPart = parts.slice(1).join(" ");
+          cargoHtml = `<span style="display:inline-block; font-size:0.82rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:2px 8px; border-radius:12px; font-weight:700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${cargoPart}</span>`;
+        }
+
+        tr.innerHTML = `
+          <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
+          <td>${idx + 1}</td>
+          <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
+          <td><b>${driverName}</b></td>
+          <td>${r.plate}</td>
+          <td>${cargoHtml}</td>
+          <td>${r.weight.toLocaleString()}</td>
+          <td>${runningTotal.toLocaleString()}</td>
+          <td>${r.exit_time}</td>
+          <td style="text-align: center; white-space: nowrap;">
+            <button class="edit-row-btn" onclick="editDispatchRecord(${r.id})">編輯</button>
+            <button class="del-btn" onclick="deleteRecord(${r.id})">刪除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const titlePrefix = activeProject ? `【${activeProject}】總重` : "工地總重";
+      const totalLabelEl = document.getElementById("projectTotalLabel");
+      if (totalLabelEl) totalLabelEl.textContent = titlePrefix + "：";
+      document.getElementById("allTotalKg").textContent = runningTotal.toLocaleString();
+      document.getElementById("allTotalTon").textContent = (runningTotal / 1000).toFixed(2);
+      calculateSelected();
+      updateDemandStatus();
+    }
+
+    function calculateSelected() {
+      const checkboxes = document.querySelectorAll(".row-select");
+      let sum = 0;
+      checkboxes.forEach(cb => {
+        if (cb.checked) sum += Number(cb.dataset.weight);
+      });
+      document.getElementById("selectedKg").textContent = sum.toLocaleString();
+      document.getElementById("selectedTon").textContent = (sum / 1000).toFixed(2);
+    }
+
+    function applyRangeSelection() {
+      const from = parseInt(document.getElementById("fromIndex").value, 10);
+      const to = parseInt(document.getElementById("toIndex").value, 10);
+      if (isNaN(from) || isNaN(to) || from > to) return;
+
+      document.querySelectorAll(".row-select").forEach((cb, idx) => {
+        const rank = idx + 1;
+        cb.checked = rank >= from && rank <= to;
+      });
+      calculateSelected();
+    }
+
+    function toggleSelectAll(status) {
+      document.querySelectorAll(".row-select").forEach(cb => cb.checked = status);
+      document.getElementById("checkAll").checked = status;
+      calculateSelected();
+    }
+
+    function editDispatchRecord(id) {
+      const record = currentRecords.find(r => Number(r.id) === Number(id));
+      if (!record) {
+        alert("找不到此車次紀錄！");
+        return;
+      }
+
+      editingDispatchId = id;
+      document.getElementById("editDispatchId").value = id;
+      document.getElementById("customer").value = record.customer || "";
+      document.getElementById("project").value = record.project || "";
+      document.getElementById("material").value = record.material || "";
+      
+      // 若原先紀錄的 driver 欄位中包含備註 (例如 "道友  黏油1顆,累計1顆" 或純司機名)
+      let dVal = record.driver || "";
+      let noteVal = "";
+      if (dVal.includes("  ")) {
+        const parts = dVal.split(/\s{2,}/);
+        dVal = parts[0].trim();
+        noteVal = parts.slice(1).join(" ").trim();
+      }
+      document.getElementById("driver").value = dVal;
+      document.getElementById("cargo_notes").value = noteVal;
+
+      document.getElementById("plate").value = record.plate || "";
+      document.getElementById("weight").value = record.weight || "";
+      document.getElementById("exit_time").value = record.exit_time && record.exit_time !== '-' ? record.exit_time : "";
+
+      // 更新表單標題與按鈕文字
+      document.getElementById("dispatchFormTitle").textContent = `✏️ 編輯車次紀錄 (車牌: ${record.plate})`;
+      document.getElementById("btnSubmitDispatch").textContent = "💾 儲存修改";
+      document.getElementById("btnCancelEditDispatch").style.display = "inline-block";
+
+      // 高亮當前編輯行並平滑滾動到輸入表單
+      renderTable();
+      document.getElementById("dispatchFormCard").scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById("weight").focus();
+    }
+
+    function cancelEditEntry() {
+      editingDispatchId = null;
+      document.getElementById("editDispatchId").value = "";
+      document.getElementById("driver").value = "";
+      document.getElementById("cargo_notes").value = "";
+      document.getElementById("cargoQuickSelect").value = "";
+      document.getElementById("plate").value = "";
+      document.getElementById("weight").value = "";
+      document.getElementById("exit_time").value = "";
+      document.getElementById("dispatchFormTitle").textContent = "單車次過磅紀錄新增";
+      document.getElementById("btnSubmitDispatch").textContent = "儲存並發送";
+      document.getElementById("btnCancelEditDispatch").style.display = "none";
+      renderTable();
+    }
+
+    async function submitEntry() {
+      let rawTime = document.getElementById("exit_time").value.trim();
+      let cleanTime = rawTime.replace(/[^0-9]/g, '');
+      let formattedTime = rawTime;
+      if (cleanTime.length === 4) {
+        formattedTime = cleanTime.slice(0, 2) + ':' + cleanTime.slice(2, 4);
+      } else if (cleanTime.length === 3) {
+        formattedTime = '0' + cleanTime.slice(0, 1) + ':' + cleanTime.slice(1, 3);
+      }
+
+      const rawDriver = document.getElementById("driver").value.trim() || "-";
+      const cargoNotes = document.getElementById("cargo_notes").value.trim();
+      // 如果有填寫或選擇隨車寄送物品，自動格式化附加在司機姓名後方，如 "道友  黏油1顆"
+      const fullDriverField = cargoNotes ? `${rawDriver}  ${cargoNotes}` : rawDriver;
+
+      const isEditing = Boolean(editingDispatchId);
+      const payload = {
+        customer: document.getElementById("customer").value.trim(),
+        project: document.getElementById("project").value.trim(),
+        material: document.getElementById("material").value.trim(),
+        driver: fullDriverField,
+        plate: document.getElementById("plate").value.trim(),
+        weight: parseInt(document.getElementById("weight").value, 10),
+        exit_time: formattedTime || '-'
+      };
+
+      if (!payload.plate || isNaN(payload.weight) || payload.weight <= 0) {
+        alert("請確認車牌與重量填寫正確！");
+        return;
+      }
+
+      const submitBtn = document.getElementById("btnSubmitDispatch");
+      const originalBtnText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = isEditing ? "正在儲存修改..." : "正在儲存...";
+
+      // 備份原始紀錄以便失敗時回滾
+      const originalRecords = [...currentRecords];
+
+      // 樂觀更新 (Optimistic UI)：0 秒立即反應在表格、累計與需求統計上，不必等待 GAS
+      const curProject = payload.project;
+      const removedProjects = getRemovedProjects();
+      if (removedProjects.has(curProject)) {
+        removedProjects.delete(curProject);
+        saveRemovedProjects(removedProjects, true);
+      }
+      if (isEditing) {
+        const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(editingDispatchId));
+        if (targetIdx !== -1) {
+          currentRecords[targetIdx] = {
+            ...currentRecords[targetIdx],
+            ...payload,
+            id: editingDispatchId
+          };
+        }
+        cancelEditEntry();
+      } else {
+        // 先給予暫時的臨時 ID，立即加入表格並清空表單，讓操作者能馬上記錄下一車
+        const tempId = Date.now();
+        const optimisticRecord = {
+          id: tempId,
+          ...payload,
+          created_at: new Date().toISOString()
+        };
+        currentRecords.unshift(optimisticRecord);
+
+        // 清空表單欄位供下一車輸入
+        document.getElementById("driver").value = "";
+        document.getElementById("cargo_notes").value = "";
+        document.getElementById("cargoQuickSelect").value = "";
+        document.getElementById("plate").value = "";
+        document.getElementById("weight").value = "";
+        document.getElementById("exit_time").value = "";
+      }
+
+      // 立即重繪畫面與總重統計 (0 秒無延遲)
+      saveCachedRecords(currentRecords);
+      updateKnownProjects();
+      renderProjectTabs();
+      renderTable();
+      updateDemandStatus();
+
+      // 背景發送至 Google Apps Script 雲端試算表
+      const statusEl = document.getElementById("apiStatusText");
+      if (statusEl) statusEl.textContent = '正在同步雲端...';
+
+      try {
+        if (isEditing) {
+          payload.id = editingDispatchId;
+          try {
+            await window.ScaleApi.postAction('updateDispatch', payload);
+          } catch (updateErr) {
+            console.warn("GAS 尚未部署 updateDispatch，切換為相容模式更新...", updateErr);
+            await window.ScaleApi.postAction('deleteDispatch', { id: editingDispatchId });
+            await window.ScaleApi.postAction('addDispatch', payload);
+          }
+        } else {
+          const res = await window.ScaleApi.postAction('addDispatch', payload);
+          if (res && res.success && res.data) {
+            // 用雲端回傳的正式 ID 替換臨時 ID
+            const idx = currentRecords.findIndex(r => r.plate === payload.plate && r.weight === payload.weight);
+            if (idx !== -1) {
+              currentRecords[idx].id = res.data.id;
+            }
+          }
+        }
+        const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+        if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
+      } catch (err) {
+        console.error("雲端儲存失敗，進行資料回滾:", err);
+        alert((isEditing ? "雲端修改同步失敗: " : "雲端儲存同步失敗: ") + err.message);
+        currentRecords = originalRecords;
+        renderTable();
+        updateDemandStatus();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "儲存並發送";
+      }
+    }
+
+    async function deleteRecord(id) {
+      if (!confirm("確定要刪除此筆出貨紀錄嗎？")) return;
+
+      // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除與重新計算累計
+      const originalRecords = [...currentRecords];
+      currentRecords = currentRecords.filter(r => r.id !== id);
+      saveCachedRecords(currentRecords);
+      renderTable();
+      document.getElementById("apiStatusText").textContent = '正在同步刪除雲端紀錄...';
+
+      try {
+        // 背景同步至 Google Apps Script 試算表
+        await window.ScaleApi.postAction('deleteDispatch', { id: id });
+        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+      } catch (err) {
+        // 若雲端刪除失敗則自動回滾復原
+        alert("雲端同步刪除失敗: " + err.message);
+        currentRecords = originalRecords;
+        renderTable();
+      }
+    }
+
+    async function batchDeleteSelected() {
+      const selectedBoxes = Array.from(document.querySelectorAll('.row-select:checked'));
+      if (selectedBoxes.length === 0) {
+        alert("請先勾選欲刪除的車次！");
+        return;
+      }
+
+      const targetIds = selectedBoxes.map(cb => Number(cb.dataset.id)).filter(Boolean);
+      if (targetIds.length === 0) {
+        alert("找不到所選紀錄的 ID！");
+        return;
+      }
+
+      if (!confirm(`確定要一次刪除已勾選的 ${targetIds.length} 筆出貨紀錄嗎？\n(此動作將從 Google 試算表中同步移除)`)) return;
+
+      const deleteBtn = document.querySelector("button[onclick='batchDeleteSelected()']");
+      if (deleteBtn) {
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = '⏳ 刪除中...';
+      }
+
+      const statusEl = document.getElementById("apiStatusText");
+      if (statusEl) statusEl.textContent = `準備刪除 ${targetIds.length} 筆雲端紀錄...`;
+
+      // 先嘗試 GAS 批次端點 batchDeleteDispatches (若後端支援則 1 次請求搞定)
+      let batchSuccess = false;
+      try {
+        const batchRes = await window.ScaleApi.postAction('batchDeleteDispatches', { ids: targetIds });
+        if (batchRes && batchRes.success) {
+          batchSuccess = true;
+        }
+      } catch (e) {
+        // 若後端尚未更新 batchDeleteDispatches，平滑切換為逐筆並行批次刪除
+        batchSuccess = false;
+      }
+
+      let deletedIds = [];
+      let failedIds = [];
+
+      if (batchSuccess) {
+        deletedIds = targetIds;
+      } else {
+        // 平行分組刪除 (每組 3 個請求，避免超過 GAS 並發限制與造成超時)
+        const CHUNK_SIZE = 3;
+        for (let i = 0; i < targetIds.length; i += CHUNK_SIZE) {
+          const chunk = targetIds.slice(i, i + CHUNK_SIZE);
+          if (statusEl) statusEl.textContent = `正在刪除雲端紀錄 (${Math.min(i + chunk.length, targetIds.length)}/${targetIds.length})...`;
+          
+          const results = await Promise.allSettled(
+            chunk.map(id => window.ScaleApi.postAction('deleteDispatch', { id: id }))
+          );
+
+          results.forEach((res, idx) => {
+            const id = chunk[idx];
+            if (res.status === 'fulfilled' && res.value && res.value.success) {
+              deletedIds.push(id);
+            } else {
+              failedIds.push(id);
+            }
+          });
+        }
+      }
+
+      // 移除成功刪除的項目
+      if (deletedIds.length > 0) {
+        const deletedSet = new Set(deletedIds);
+        currentRecords = currentRecords.filter(r => !deletedSet.has(r.id));
+        updateKnownProjects();
+        renderProjectTabs();
+        renderTable();
+      }
+
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = '🗑️ 刪除已勾選車次';
+      }
+
+      const checkAll = document.getElementById("checkAll");
+      if (checkAll) checkAll.checked = false;
+
+      if (statusEl) statusEl.textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+
+      if (failedIds.length > 0) {
+        alert(`已成功刪除 ${deletedIds.length} 筆，但有 ${failedIds.length} 筆刪除失敗或未在試算表中找到。`);
+      } else {
+        alert(`成功刪除 ${deletedIds.length} 筆紀錄！`);
+      }
+    }
+
+    initApiConfig();
+    // 優先立即使用快取呈現畫面 (0 秒載入，不等待網路)
+    updateKnownProjects();
+    renderProjectTabs();
+    renderTable();
+    updateDemandStatus();
+    // 背景同步最新雲端資料
+    loadRecords();
+  </script>
+</body>
+</html>
