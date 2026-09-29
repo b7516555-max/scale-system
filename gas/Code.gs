@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 地磅調度出貨管理系統 - Google Apps Script (GAS) 後端 Web API
  */
 
@@ -111,7 +111,7 @@ function doPost(e) {
       const targetIds = Array.isArray(payload.ids) ? payload.ids.map(Number).filter(Boolean) : (payload.id ? [Number(payload.id)] : []);
       if (targetIds.length === 0) return createJsonResponse({ success: false, error: '請指定要刪除的紀錄 ID' });
       const lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return createJsonResponse({ success: false, error: '無任何紀錄可刪除' });
+      if (lastRow <= 1) return createJsonResponse({ success: true, message: '無任何紀錄需刪除', deletedCount: 0, deletedIds: targetIds });
       const idTargetSet = {};
       targetIds.forEach(id => { idTargetSet[id] = true; });
       const idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
@@ -119,22 +119,29 @@ function doPost(e) {
       for (let i = idValues.length - 1; i >= 0; i--) {
         if (idTargetSet[Number(idValues[i][0])]) { sheet.deleteRow(i + 2); deletedCount++; }
       }
-      if (deletedCount > 0) return createJsonResponse({ success: true, message: `已成功刪除 ${deletedCount} 筆紀錄`, deletedCount, deletedIds: targetIds });
-      return createJsonResponse({ success: false, error: '找不到指定的紀錄 ID: ' + targetIds.join(', ') });
+      return createJsonResponse({ success: true, message: `已成功刪除 ${deletedCount} 筆紀錄`, deletedCount, deletedIds: targetIds });
     }
 
     if (action === 'updateDispatch') {
       const { id, customer, project, material, driver, plate, weight, exit_time } = payload;
       if (!id) return createJsonResponse({ success: false, error: '請指定要修改的紀錄 ID' });
       const lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return createJsonResponse({ success: false, error: '無任何紀錄可修改' });
+      const now = Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd HH:mm:ss');
+      if (lastRow <= 1) {
+        // 若試算表目前為空，直接作為新紀錄補齊追加
+        sheet.appendRow([Number(id), customer||'', project||'', material||'', driver||'-', plate ? plate.trim().toUpperCase() : '', Number(weight)||0, exit_time||'-', now]);
+        return createJsonResponse({ success: true, message: '原ID不存在，已自動補建追加紀錄', data: { id: Number(id), customer, project, material, driver, plate, weight: Number(weight), exit_time, created_at: now } });
+      }
       const idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
       let targetRow = -1;
       for (let i = 0; i < idValues.length; i++) {
         if (Number(idValues[i][0]) === Number(id)) { targetRow = i + 2; break; }
       }
-      if (targetRow === -1) return createJsonResponse({ success: false, error: '找不到指定的紀錄 ID: ' + id });
-      const now = Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd HH:mm:ss');
+      if (targetRow === -1) {
+        // 找不到指定 ID 時，自動補建該筆紀錄，避免拋出找不到錯誤導致前端回滾
+        sheet.appendRow([Number(id), customer||'', project||'', material||'', driver||'-', plate ? plate.trim().toUpperCase() : '', Number(weight)||0, exit_time||'-', now]);
+        return createJsonResponse({ success: true, message: '原ID不存在，已自動補建追加紀錄', data: { id: Number(id), customer, project, material, driver, plate, weight: Number(weight), exit_time, created_at: now } });
+      }
       sheet.getRange(targetRow, 2, 1, 7).setValues([[customer||'', project||'', material||'', driver||'-', plate ? plate.trim().toUpperCase() : '', Number(weight)||0, exit_time||'-']]);
       return createJsonResponse({ success: true, message: '修改成功', data: { id: Number(id), customer, project, material, driver, plate, weight: Number(weight), exit_time, updated_at: now } });
     }

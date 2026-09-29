@@ -220,6 +220,7 @@
       <span class="badge-edit-mode">✍️ 編輯版</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
+      <button onclick="refreshData()" class="nav-switch-btn" id="btnHeaderRefresh" title="強制重新同步最新雲端資料" style="background:#edf2f7; color:#2d3748; border:1px solid #cbd5e0; cursor:pointer;">🔄 重新整理</button>
       <button onclick="toggleServerBar()" style="background:none; border:none; color:#a0aec0; cursor:pointer; font-size:0.85rem; padding:4px;" title="API伺服器設定">⚙️</button>
       <a href="view.html" class="nav-switch-btn">📱 前往「查詢版」</a>
     </div>
@@ -1890,6 +1891,32 @@
       }
     }
 
+    async function refreshData() {
+      const btn = document.getElementById("btnHeaderRefresh");
+      const statusEl = document.getElementById("apiStatusText");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ 同步中...";
+      }
+      if (statusEl) statusEl.textContent = "正在從雲端載入最新紀錄...";
+      try {
+        await loadRecords();
+        if (btn) btn.textContent = "✅ 已更新";
+        setTimeout(() => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "🔄 重新整理";
+          }
+        }, 1200);
+      } catch (e) {
+        alert("重新整理失敗: " + e.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "🔄 重新整理";
+        }
+      }
+    }
+
     function renderTable() {
       const tbody = document.getElementById("tableBody");
       tbody.innerHTML = "";
@@ -2074,13 +2101,16 @@
         removedProjects.delete(curProject);
         saveRemovedProjects(removedProjects, true);
       }
+
+      const targetEditingId = editingDispatchId; // 妥善保留欲編輯的 ID，避免被 cancelEditEntry 清空
+
       if (isEditing) {
-        const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(editingDispatchId));
+        const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(targetEditingId));
         if (targetIdx !== -1) {
           currentRecords[targetIdx] = {
             ...currentRecords[targetIdx],
             ...payload,
-            id: editingDispatchId
+            id: targetEditingId
           };
         }
         cancelEditEntry();
@@ -2116,13 +2146,34 @@
 
       try {
         if (isEditing) {
-          payload.id = editingDispatchId;
+          payload.id = targetEditingId;
+          let updateSuccess = false;
           try {
-            await window.ScaleApi.postAction('updateDispatch', payload);
+            const upRes = await window.ScaleApi.postAction('updateDispatch', payload);
+            if (upRes && upRes.success) {
+              updateSuccess = true;
+            }
           } catch (updateErr) {
-            console.warn("GAS 尚未部署 updateDispatch，切換為相容模式更新...", updateErr);
-            await window.ScaleApi.postAction('deleteDispatch', { id: editingDispatchId });
-            await window.ScaleApi.postAction('addDispatch', payload);
+            console.warn("GAS updateDispatch 失敗或找不到紀錄 ID，自動切換至補建/相容模式...", updateErr);
+          }
+
+          if (!updateSuccess) {
+            // 若 updateDispatch 失敗 (例如雲端找不到此 ID 或舊版 GAS)，安全嘗試清理舊 ID (忽略不存在錯誤)
+            try {
+              await window.ScaleApi.postAction('deleteDispatch', { id: targetEditingId });
+            } catch (delErr) {
+              console.warn("嘗試刪除舊 ID 略過 (雲端可能本就無此紀錄):", delErr);
+            }
+            // 在雲端重新新增該筆出貨紀錄
+            const addRes = await window.ScaleApi.postAction('addDispatch', payload);
+            if (addRes && addRes.success && addRes.data && addRes.data.id) {
+              const recIdx = currentRecords.findIndex(r => Number(r.id) === Number(targetEditingId));
+              if (recIdx !== -1) {
+                currentRecords[recIdx].id = addRes.data.id;
+              }
+              saveCachedRecords(currentRecords);
+              renderTable();
+            }
           }
         } else {
           const res = await window.ScaleApi.postAction('addDispatch', payload);
@@ -2131,6 +2182,7 @@
             const idx = currentRecords.findIndex(r => r.plate === payload.plate && r.weight === payload.weight);
             if (idx !== -1) {
               currentRecords[idx].id = res.data.id;
+              saveCachedRecords(currentRecords);
             }
           }
         }
@@ -2140,6 +2192,7 @@
         console.error("雲端儲存失敗，進行資料回滾:", err);
         alert((isEditing ? "雲端修改同步失敗: " : "雲端儲存同步失敗: ") + err.message);
         currentRecords = originalRecords;
+        saveCachedRecords(currentRecords);
         renderTable();
         updateDemandStatus();
       } finally {
@@ -2153,20 +2206,32 @@
 
       // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除與重新計算累計
       const originalRecords = [...currentRecords];
-      currentRecords = currentRecords.filter(r => r.id !== id);
+      currentRecords = currentRecords.filter(r => Number(r.id) !== Number(id));
       saveCachedRecords(currentRecords);
       renderTable();
-      document.getElementById("apiStatusText").textContent = '正在同步刪除雲端紀錄...';
+      updateDemandStatus();
+      const statusEl = document.getElementById("apiStatusText");
+      if (statusEl) statusEl.textContent = '正在同步刪除雲端紀錄...';
 
       try {
         // 背景同步至 Google Apps Script 試算表
         await window.ScaleApi.postAction('deleteDispatch', { id: id });
-        document.getElementById("apiStatusText").textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+        const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+        if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
       } catch (err) {
-        // 若雲端刪除失敗則自動回滾復原
+        // 若雲端回報找不到該 ID，代表雲端原本就沒有該紀錄（已刪除或失步），視為刪除成功，不需回滾
+        if (err && err.message && err.message.includes('找不到指定的紀錄')) {
+          console.warn("雲端原本就無此紀錄 ID，維持本地已刪除狀態:", id);
+          const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+          if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
+          return;
+        }
+        // 若是其他網路連線失敗則自動回滾復原
         alert("雲端同步刪除失敗: " + err.message);
         currentRecords = originalRecords;
+        saveCachedRecords(currentRecords);
         renderTable();
+        updateDemandStatus();
       }
     }
 
@@ -2225,6 +2290,9 @@
           results.forEach((res, idx) => {
             const id = chunk[idx];
             if (res.status === 'fulfilled' && res.value && res.value.success) {
+              deletedIds.push(id);
+            } else if (res.status === 'rejected' && res.reason && res.reason.message && res.reason.message.includes('找不到指定的紀錄')) {
+              // 雲端原本就無此紀錄，視同已成功自雲端移除
               deletedIds.push(id);
             } else {
               failedIds.push(id);
