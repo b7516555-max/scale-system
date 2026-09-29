@@ -302,7 +302,8 @@
     let projectCounts = new Map();
     let projectSettingsMap = {};
 
-    const CACHE_KEY = 'scale_view_cache_data';
+    const CACHE_KEY = 'scale_records_cache_v1';
+    const LEGACY_CACHE_KEY = 'scale_view_cache_data';
     const CACHE_TIME_KEY = 'scale_view_cache_time';
 
     // 檢查 URL 參數是否指定了特定工程地點 (例如 ?project=苓雅區武慶三路&target=150)
@@ -452,16 +453,30 @@
     // 1. 立即讀取本地快取 (0秒秒開)
     function loadFromCache() {
       try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const list = JSON.parse(cached);
+        let raw = localStorage.getItem(CACHE_KEY) || localStorage.getItem(LEGACY_CACHE_KEY);
+        if (raw) {
+          const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            dispatches = list;
+            // 解析出貨車次與工程設定
+            list.filter(r => r.plate === '__SET__').forEach(r => {
+              try {
+                const pName = (r.customer || '').trim();
+                if (!pName || pName === '__PROJECT_CONFIG__') return;
+                const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+                projectSettingsMap[pName] = {
+                  target: Number(cfg.target) || 0,
+                  wait: String(cfg.wait || '').trim(),
+                  customer: cfg.customer || '',
+                  material: cfg.material || ''
+                };
+              } catch(e) {}
+            });
+            dispatches = list.filter(r => r.plate !== '__SET__');
             updateProjectCounts();
             renderProjectTabs();
             renderList();
-            const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
-            updateSyncStatus('loading', cacheTime ? `快取 (${cacheTime}) 正在同步...` : '同步最新資料...');
+            const cacheTime = localStorage.getItem(CACHE_TIME_KEY) || getShortTime();
+            updateSyncStatus('done', `已更新 (${cacheTime})`);
             return true;
           }
         }
@@ -471,9 +486,14 @@
       return false;
     }
 
-    // 2. 背景或主動發起雲端同步
-    async function fetchData(isManual = false) {
-      updateSyncStatus('loading', isManual ? '正在更新...' : '同步最新資料...');
+    // 2. 背景或主動發起雲端同步 (支援靜默背景輪詢)
+    let isFetching = false;
+    async function fetchData(isManual = false, isSilent = false) {
+      if (isFetching) return;
+      isFetching = true;
+      if (!isSilent) {
+        updateSyncStatus('loading', isManual ? '正在更新...' : '同步最新資料...');
+      }
       try {
         const freshData = await window.ScaleApi.fetchDispatches();
 
@@ -499,25 +519,35 @@
         });
 
         // 過濾掉 __SET__ 記錄，只保留真正的出貨車次
-        dispatches = freshData.filter(r => r.plate !== '__SET__');
+        const freshDispatches = freshData.filter(r => r.plate !== '__SET__');
 
+        // 比對資料是否有變更
+        const isChanged = dispatches.length !== freshDispatches.length ||
+          JSON.stringify(freshDispatches.map(d => ({ id: d.id, weight: d.weight, plate: d.plate }))) !==
+          JSON.stringify(dispatches.map(d => ({ id: d.id, weight: d.weight, plate: d.plate })));
 
-        // 存入本地快取
+        dispatches = freshDispatches;
+
+        // 存入雙重本地持久快取
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(dispatches));
+          localStorage.setItem(CACHE_KEY, JSON.stringify(freshData));
+          localStorage.setItem(LEGACY_CACHE_KEY, JSON.stringify(dispatches));
           localStorage.setItem(CACHE_TIME_KEY, getShortTime());
         } catch (e) {
           console.warn('快取寫入失敗:', e);
         }
 
-        updateProjectCounts();
-        renderProjectTabs();
-        renderList();
+        if (isChanged || !isSilent) {
+          updateProjectCounts();
+          renderProjectTabs();
+          renderList();
+        }
+
         updateSyncStatus('done', `已更新 (${getShortTime()})`);
       } catch (err) {
         console.error('資料載入錯誤:', err);
         if (dispatches.length > 0) {
-          updateSyncStatus('error', '網路異常 (使用快取)');
+          updateSyncStatus('error', '網路稍慢 (維持即時顯示)');
         } else {
           updateSyncStatus('error', '載入失敗');
           document.getElementById('truckList').innerHTML = `
@@ -527,17 +557,57 @@
             </div>
           `;
         }
+      } finally {
+        isFetching = false;
       }
     }
 
-
-
     // 手動刷新按鈕
     function refreshData() {
-      fetchData(true);
+      fetchData(true, false);
     }
 
-    // 初始化流程：先以快取 0 秒展示，隨即背景抓取最新資料 (SWR 模式)
+    // 智慧自動定時靜態輪詢 (Auto-Polling)：每 6 秒背景靜默同步一次
+    let autoPollTimer = null;
+    function startAutoPolling() {
+      if (autoPollTimer) clearInterval(autoPollTimer);
+      autoPollTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchData(false, true); // silent polling
+        }
+      }, 6000);
+    }
+
+    // 當手機解鎖、使用者切換回此分頁時立即靜默更新
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        loadFromCache();
+        fetchData(false, true);
+      }
+    });
+    window.addEventListener('focus', () => {
+      loadFromCache();
+      fetchData(false, true);
+    });
+
+    // 跨分頁 0 秒極速連動 (當編輯版 index.html 儲存或刪除時，唯讀版 0.001 秒即刻更新)
+    try {
+      const syncChannel = new BroadcastChannel('scale_system_sync');
+      syncChannel.onmessage = (event) => {
+        if (event.data && (event.data.type === 'SYNC_DISPATCHES' || event.data.type === 'DATA_UPDATED')) {
+          loadFromCache();
+          fetchData(false, true);
+        }
+      };
+    } catch (e) {}
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === CACHE_KEY || e.key === LEGACY_CACHE_KEY || e.key === 'scale_last_update_ts') {
+        loadFromCache();
+      }
+    });
+
+    // 初始化流程：先以快取 0 秒展示，隨即背景抓取最新資料，並啟動每 6 秒自動輪詢
     function init() {
       const hasCache = loadFromCache();
       if (!hasCache) {
@@ -550,6 +620,7 @@
         `;
       }
       fetchData();
+      startAutoPolling();
     }
 
     function updateProjectCounts() {

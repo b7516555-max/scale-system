@@ -1265,6 +1265,14 @@
     function saveCachedRecords(records) {
       try {
         localStorage.setItem(STORAGE_RECORDS_CACHE_KEY, JSON.stringify(records || []));
+        // 同步寫入 view.html 唯讀版快取，並透過 BroadcastChannel 即時通知跨頁籤 0 秒連動
+        const pureDispatches = (records || []).filter(r => r.plate !== '__SET__');
+        localStorage.setItem('scale_view_cache_data', JSON.stringify(pureDispatches));
+        localStorage.setItem('scale_last_update_ts', String(Date.now()));
+        try {
+          const ch = new BroadcastChannel('scale_system_sync');
+          ch.postMessage({ type: 'DATA_UPDATED', timestamp: Date.now() });
+        } catch (e) {}
       } catch (e) {}
     }
 
