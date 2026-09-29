@@ -2208,8 +2208,11 @@
       const originalRecords = [...currentRecords];
       currentRecords = currentRecords.filter(r => Number(r.id) !== Number(id));
       saveCachedRecords(currentRecords);
+      updateKnownProjects();
+      renderProjectTabs();
       renderTable();
       updateDemandStatus();
+      
       const statusEl = document.getElementById("apiStatusText");
       if (statusEl) statusEl.textContent = '正在同步刪除雲端紀錄...';
 
@@ -2230,6 +2233,8 @@
         alert("雲端同步刪除失敗: " + err.message);
         currentRecords = originalRecords;
         saveCachedRecords(currentRecords);
+        updateKnownProjects();
+        renderProjectTabs();
         renderTable();
         updateDemandStatus();
       }
@@ -2257,9 +2262,25 @@
       }
 
       const statusEl = document.getElementById("apiStatusText");
-      if (statusEl) statusEl.textContent = `準備刪除 ${targetIds.length} 筆雲端紀錄...`;
 
-      // 先嘗試 GAS 批次端點 batchDeleteDispatches (若後端支援則 1 次請求搞定)
+      // 1. 【樂觀更新 (Optimistic UI) 0 秒瞬間生效】：畫面立即移除所選車次、清空全選勾選框、即刻重算總重與累計需求
+      const originalRecords = [...currentRecords];
+      const targetIdSet = new Set(targetIds.map(Number));
+      currentRecords = currentRecords.filter(r => !targetIdSet.has(Number(r.id)));
+
+      // 立即寫入本地持久快取，確保重新整理或關閉分頁絕不回彈
+      saveCachedRecords(currentRecords);
+      updateKnownProjects();
+      renderProjectTabs();
+      renderTable();
+      updateDemandStatus();
+
+      const checkAll = document.getElementById("checkAll");
+      if (checkAll) checkAll.checked = false;
+
+      if (statusEl) statusEl.textContent = `已自畫面移除，正在同步刪除 ${targetIds.length} 筆雲端紀錄...`;
+
+      // 2. 【雲端同步刪除】：優先以批次端點發送；若舊版後端不支援批次，則依序平滑發送，避免並發存取 Google Sheets 產生 deleteRow 行位飄移與鎖定衝突
       let batchSuccess = false;
       try {
         const batchRes = await window.ScaleApi.postAction('batchDeleteDispatches', { ids: targetIds });
@@ -2267,47 +2288,39 @@
           batchSuccess = true;
         }
       } catch (e) {
-        // 若後端尚未更新 batchDeleteDispatches，平滑切換為逐筆並行批次刪除
-        batchSuccess = false;
-      }
-
-      let deletedIds = [];
-      let failedIds = [];
-
-      if (batchSuccess) {
-        deletedIds = targetIds;
-      } else {
-        // 平行分組刪除 (每組 3 個請求，避免超過 GAS 並發限制與造成超時)
-        const CHUNK_SIZE = 3;
-        for (let i = 0; i < targetIds.length; i += CHUNK_SIZE) {
-          const chunk = targetIds.slice(i, i + CHUNK_SIZE);
-          if (statusEl) statusEl.textContent = `正在刪除雲端紀錄 (${Math.min(i + chunk.length, targetIds.length)}/${targetIds.length})...`;
-          
-          const results = await Promise.allSettled(
-            chunk.map(id => window.ScaleApi.postAction('deleteDispatch', { id: id }))
-          );
-
-          results.forEach((res, idx) => {
-            const id = chunk[idx];
-            if (res.status === 'fulfilled' && res.value && res.value.success) {
-              deletedIds.push(id);
-            } else if (res.status === 'rejected' && res.reason && res.reason.message && res.reason.message.includes('找不到指定的紀錄')) {
-              // 雲端原本就無此紀錄，視同已成功自雲端移除
-              deletedIds.push(id);
-            } else {
-              failedIds.push(id);
-            }
-          });
+        try {
+          const res2 = await window.ScaleApi.postAction('deleteDispatch', { ids: targetIds });
+          if (res2 && res2.success) {
+            batchSuccess = true;
+          }
+        } catch (e2) {
+          batchSuccess = false;
         }
       }
 
-      // 移除成功刪除的項目
-      if (deletedIds.length > 0) {
-        const deletedSet = new Set(deletedIds);
-        currentRecords = currentRecords.filter(r => !deletedSet.has(r.id));
-        updateKnownProjects();
-        renderProjectTabs();
-        renderTable();
+      let deletedCount = 0;
+      let failedIds = [];
+
+      if (batchSuccess) {
+        deletedCount = targetIds.length;
+      } else {
+        // 舊版 GAS 逐筆依序同步（Sequential），穩定安全不衝突
+        for (let i = 0; i < targetIds.length; i++) {
+          const id = targetIds[i];
+          if (statusEl) statusEl.textContent = `正在同步雲端試算表 (${i + 1}/${targetIds.length})...`;
+          try {
+            await window.ScaleApi.postAction('deleteDispatch', { id: id });
+            deletedCount++;
+          } catch (delErr) {
+            // 若雲端原本就無此紀錄 (例如先前已清除或已失步)，視為雲端已無該筆紀錄，屬正常已移除
+            if (delErr && delErr.message && delErr.message.includes('找不到指定的紀錄')) {
+              deletedCount++;
+            } else {
+              console.warn(`刪除雲端紀錄 ID ${id} 失敗:`, delErr);
+              failedIds.push(id);
+            }
+          }
+        }
       }
 
       if (deleteBtn) {
@@ -2315,15 +2328,20 @@
         deleteBtn.textContent = '🗑️ 刪除已勾選車次';
       }
 
-      const checkAll = document.getElementById("checkAll");
-      if (checkAll) checkAll.checked = false;
-
-      if (statusEl) statusEl.textContent = '連線正常 (共 ' + currentRecords.length + ' 筆)';
+      const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
+      if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
 
       if (failedIds.length > 0) {
-        alert(`已成功刪除 ${deletedIds.length} 筆，但有 ${failedIds.length} 筆刪除失敗或未在試算表中找到。`);
-      } else {
-        alert(`成功刪除 ${deletedIds.length} 筆紀錄！`);
+        // 若真有網路異常導致的失敗，將失敗的筆數復原
+        const failedSet = new Set(failedIds.map(Number));
+        const toRestore = originalRecords.filter(r => failedSet.has(Number(r.id)));
+        currentRecords = [...toRestore, ...currentRecords];
+        saveCachedRecords(currentRecords);
+        updateKnownProjects();
+        renderProjectTabs();
+        renderTable();
+        updateDemandStatus();
+        alert(`已成功同步刪除 ${deletedCount} 筆，但有 ${failedIds.length} 筆連線失敗，已自動復原顯示。`);
       }
     }
 
