@@ -362,9 +362,13 @@
         </div>
       </div>
     </div>
-    <div style="display: flex; gap: 10px; align-items: center;">
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <button class="btn-primary" id="btnSubmitDispatch" onclick="submitEntry()">儲存並發送</button>
       <button class="btn-secondary" id="btnCancelEditDispatch" style="display: none;" onclick="cancelEditEntry()">取消編輯</button>
+      <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.88rem; font-weight: 700; color: #2d3748; background: #edf2f7; padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e0; user-select: none;" title="勾選後此車將標記為「尾台」；若後續仍有出料可隨時在清單點擊取消或轉移">
+        <input type="checkbox" id="isTailTruckCheckbox" style="width: 17px; height: 17px; cursor: pointer; accent-color: #c53030;">
+        <span>🏁 標記此車為「尾台」</span>
+      </label>
     </div>
   </div>
 
@@ -1955,22 +1959,27 @@
         if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
           tr.className = "editing-highlight";
         }
-        // 分離司機名稱與隨車物品獨立欄位呈現
-        const driverStr = r.driver != null ? String(r.driver) : '-';
-        let driverName = driverStr;
+        // 檢查此車是否被標記為「尾台」
+        const driverRaw = r.driver != null ? String(r.driver) : '-';
+        const isTail = driverRaw.includes('[尾台]') || r.is_tail === true;
+
+        // 清理司機欄位文字，分離司機名與隨車備註，並移除 [尾台] 標籤
+        let cleanDriverStr = driverRaw.replace(/\[尾台\]/g, '').trim();
+        let driverName = cleanDriverStr || '-';
         let cargoHtml = '<span style="color:#a0aec0;">-</span>';
-        if (driverStr && (driverStr.includes("  ") || driverStr.includes("    "))) {
-          const parts = driverStr.split(/\s{2,}/);
-          driverName = parts[0];
-          const cargoPart = parts.slice(1).join(" ");
-          cargoHtml = `<span style="display:inline-block; font-size:0.82rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:2px 8px; border-radius:12px; font-weight:700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${cargoPart}</span>`;
+        if (cleanDriverStr && (cleanDriverStr.includes("  ") || cleanDriverStr.includes("    "))) {
+          const parts = cleanDriverStr.split(/\s{2,}/);
+          driverName = parts[0].trim();
+          const cargoPart = parts.slice(1).join(" ").trim();
+          if (cargoPart) {
+            cargoHtml = `<span style="display:inline-block; font-size:0.82rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:2px 8px; border-radius:12px; font-weight:700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${cargoPart}</span>`;
+          }
         }
 
-        // 最上方的最新車次額外標註「尾台」徽章，醒目易辨識
-        const isTail = displayIdx === 0 && reversedList.length > 0;
+        // 依使用者需求：尾台符號可自主調選／取消／切換 (非尾台顯示＋設為尾台；已標記顯示🏁 尾台 ✕)
         const tailBadge = isTail
-          ? `<span style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; border:1px solid #bee3f8; padding:1px 6px; border-radius:10px; font-weight:700; margin-left:4px;">尾台</span>`
-          : '';
+          ? `<button type="button" class="badge-tail-active" onclick="toggleTailTruck(${r.id})" title="已標記為尾台（點擊可取消標記）" style="cursor: pointer; background: #e53e3e; color: #fff; font-size: 0.72rem; padding: 2px 7px; border: none; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">🏁 尾台 ✕</button>`
+          : `<button type="button" class="btn-mark-tail" onclick="toggleTailTruck(${r.id})" title="點擊將此車設為「尾台」" style="font-size: 0.72rem; color: #718096; background: #edf2f7; border: 1px dashed #cbd5e0; padding: 1px 6px; border-radius: 8px; cursor: pointer; margin-left: 4px;">＋設為尾台</button>`;
 
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-id="${r.id}" data-truck-no="${item.truckNo}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
@@ -2027,6 +2036,57 @@
       calculateSelected();
     }
 
+    async function toggleTailTruck(id) {
+      const rec = currentRecords.find(r => Number(r.id) === Number(id));
+      if (!rec) return;
+
+      const currentDriver = rec.driver != null ? String(rec.driver) : '';
+      const isCurrentlyTail = currentDriver.includes('[尾台]') || rec.is_tail === true;
+      let newDriver = '';
+
+      if (isCurrentlyTail) {
+        // 取消尾台標記
+        newDriver = currentDriver.replace(/\[尾台\]/g, '').replace(/\s{2,}$/, '').trim();
+        rec.is_tail = false;
+      } else {
+        // 先清除同工程其他車次的尾台標記 (一個工程同時只會有一輛真正尾台)
+        currentRecords.forEach(r => {
+          if (r.project === rec.project && r.driver && r.driver.includes('[尾台]')) {
+            r.driver = r.driver.replace(/\[尾台\]/g, '').replace(/\s{2,}$/, '').trim();
+            r.is_tail = false;
+          }
+        });
+        // 加入尾台標記
+        if (currentDriver.includes('  ')) {
+          newDriver = currentDriver + ' [尾台]';
+        } else {
+          newDriver = (currentDriver || '-') + '  [尾台]';
+        }
+        rec.is_tail = true;
+      }
+
+      rec.driver = newDriver;
+      saveCachedRecords(currentRecords);
+      renderTable();
+
+      // 背景發送同步至雲端 (即使離線也不卡畫面)
+      try {
+        const payload = {
+          id: rec.id,
+          customer: rec.customer,
+          project: rec.project,
+          material: rec.material,
+          driver: newDriver,
+          plate: rec.plate,
+          weight: rec.weight,
+          exit_time: rec.exit_time
+        };
+        await window.ScaleApi.postAction('updateDispatch', payload);
+      } catch (e) {
+        console.warn('同步尾台標記至雲端失敗 (本地已儲存):', e);
+      }
+    }
+
     function editDispatchRecord(id) {
       const record = currentRecords.find(r => Number(r.id) === Number(id));
       if (!record) {
@@ -2043,13 +2103,24 @@
       // 若原先紀錄的 driver 欄位中包含備註 (例如 "道友  黏油1顆,累計1顆" 或純司機名)
       let dVal = record.driver || "";
       let noteVal = "";
+      let isTail = false;
+      if (dVal.includes("[尾台]")) {
+        isTail = true;
+        dVal = dVal.replace(/\[尾台\]/g, '').trim();
+      }
       if (dVal.includes("  ")) {
         const parts = dVal.split(/\s{2,}/);
         dVal = parts[0].trim();
         noteVal = parts.slice(1).join(" ").trim();
       }
+      if (noteVal.includes("[尾台]")) {
+        isTail = true;
+        noteVal = noteVal.replace(/\[尾台\]/g, '').trim();
+      }
       document.getElementById("driver").value = dVal;
       document.getElementById("cargo_notes").value = noteVal;
+      const tailCb = document.getElementById("isTailTruckCheckbox");
+      if (tailCb) tailCb.checked = isTail;
 
       document.getElementById("plate").value = record.plate || "";
       document.getElementById("weight").value = record.weight || "";
@@ -2071,6 +2142,8 @@
       document.getElementById("editDispatchId").value = "";
       document.getElementById("driver").value = "";
       document.getElementById("cargo_notes").value = "";
+      const tailCb = document.getElementById("isTailTruckCheckbox");
+      if (tailCb) tailCb.checked = false;
       document.getElementById("cargoQuickSelect").value = "";
       document.getElementById("plate").value = "";
       document.getElementById("weight").value = "";
@@ -2092,14 +2165,31 @@
       }
 
       const rawDriver = document.getElementById("driver").value.trim() || "-";
-      const cargoNotes = document.getElementById("cargo_notes").value.trim();
-      // 如果有填寫或選擇隨車寄送物品，自動格式化附加在司機姓名後方，如 "道友  黏油1顆"
-      const fullDriverField = cargoNotes ? `${rawDriver}  ${cargoNotes}` : rawDriver;
+      let cargoNotes = document.getElementById("cargo_notes").value.trim();
+      const isTailSelected = document.getElementById("isTailTruckCheckbox") ? document.getElementById("isTailTruckCheckbox").checked : false;
+
+      // 如果勾選設為尾台，清除同工程其它車次的 [尾台] (一個工地同時只保留一輛真正尾台)
+      const curProject = document.getElementById("project").value.trim();
+      if (isTailSelected) {
+        currentRecords.forEach(r => {
+          if (r.project === curProject && r.driver && r.driver.includes('[尾台]') && Number(r.id) !== Number(editingDispatchId)) {
+            r.driver = r.driver.replace(/\[尾台\]/g, '').replace(/\s{2,}$/, '').trim();
+            r.is_tail = false;
+          }
+        });
+      }
+
+      // 如果有填寫或選擇隨車寄送物品，或勾選設為尾台，自動格式化附加在司機欄位後方
+      let driverPrefix = (rawDriver && rawDriver !== "-") ? rawDriver : "-";
+      let noteParts = [];
+      if (cargoNotes) noteParts.push(cargoNotes);
+      if (isTailSelected) noteParts.push("[尾台]");
+      const fullDriverField = noteParts.length > 0 ? `${driverPrefix}  ${noteParts.join(' ')}` : driverPrefix;
 
       const isEditing = Boolean(editingDispatchId);
       const payload = {
         customer: document.getElementById("customer").value.trim(),
-        project: document.getElementById("project").value.trim(),
+        project: curProject,
         material: document.getElementById("material").value.trim(),
         driver: fullDriverField,
         plate: document.getElementById("plate").value.trim(),
@@ -2121,7 +2211,6 @@
       const originalRecords = [...currentRecords];
 
       // 樂觀更新 (Optimistic UI)：0 秒立即反應在表格、累計與需求統計上，不必等待 GAS
-      const curProject = payload.project;
       const removedProjects = getRemovedProjects();
       if (removedProjects.has(curProject)) {
         removedProjects.delete(curProject);
@@ -2153,6 +2242,8 @@
         // 清空表單欄位供下一車輸入
         document.getElementById("driver").value = "";
         document.getElementById("cargo_notes").value = "";
+        const tailCb = document.getElementById("isTailTruckCheckbox");
+        if (tailCb) tailCb.checked = false;
         document.getElementById("cargoQuickSelect").value = "";
         document.getElementById("plate").value = "";
         document.getElementById("weight").value = "";

@@ -723,21 +723,30 @@
           calculate();
         };
 
-        const driverStr = item.driver != null ? String(item.driver) : '-';
-        let driverDisplay = driverStr;
+        const driverRaw = item.driver != null ? String(item.driver) : '-';
+        const isTail = driverRaw.includes('[尾台]') || item.is_tail === true;
+        let cleanDriverStr = driverRaw.replace(/\[尾台\]/g, '').trim();
+
+        let driverDisplay = cleanDriverStr || '-';
         let cargoTagHtml = '';
-        if (driverStr && (driverStr.includes("  ") || driverStr.includes("    "))) {
-          const parts = driverStr.split(/\s{2,}/);
-          driverDisplay = parts[0];
-          const cargoPart = parts.slice(1).join(" ");
-          cargoTagHtml = `<div style="margin-top: 3px;"><span style="display:inline-block; font-size:0.75rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; font-weight:600;">📦 ${cargoPart}</span></div>`;
+        if (cleanDriverStr && (cleanDriverStr.includes("  ") || cleanDriverStr.includes("    "))) {
+          const parts = cleanDriverStr.split(/\s{2,}/);
+          driverDisplay = parts[0].trim();
+          const cargoPart = parts.slice(1).join(" ").trim();
+          if (cargoPart) {
+            cargoTagHtml = `<div style="margin-top: 3px;"><span style="display:inline-block; font-size:0.75rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:1px 6px; border-radius:10px; font-weight:600;">📦 ${cargoPart}</span></div>`;
+          }
         }
+
+        const tailBadgeHtml = isTail
+          ? `<span style="display:inline-block; font-size:0.72rem; background:#e53e3e; color:#ffffff; padding:1px 6px; border-radius:10px; font-weight:700; margin-left:4px;">🏁 尾台</span>`
+          : '';
 
         card.innerHTML = `
           <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}">
           <div class="truck-info">
             <div class="truck-head">
-              <span class="truck-no">第 ${index + 1} 車</span>
+              <span class="truck-no">第 ${index + 1} 車${tailBadgeHtml}</span>
               <div style="text-align: right;">
                 <div>
                   <span class="truck-plate">${item.plate}</span>
@@ -755,8 +764,9 @@
         container.appendChild(card);
       });
 
-      // 尾台摘要卡：在最後一台車之後顯示本工地調度摘要
+      // 出貨摘要卡：在最後一台車之後顯示本工地調度摘要
       if (activeProject && filtered.length > 0) {
+        const hasTailTruck = filtered.some(it => String(it.driver || '').includes('[尾台]') || it.is_tail === true);
         const targetTon = getProjectTarget(activeProject);
         const dispatchedKg = filtered.reduce((acc, it) => acc + (Number(it.weight) || 0), 0);
         const dispatchedTon = dispatchedKg / 1000;
@@ -810,7 +820,7 @@
         tailCard.style.cssText = 'margin:10px 12px 6px;padding:10px 14px;background:linear-gradient(135deg,#ebf8ff 0%,#f0fff4 100%);border:1.5px solid #bee3f8;border-radius:12px;font-size:0.88rem;';
         tailCard.innerHTML = `
           <div style="font-size:0.78rem;font-weight:700;color:#2c5282;margin-bottom:6px;display:flex;align-items:center;gap:4px;">
-            📊 第 ${filtered.length} 車（尾台）出貨摘要
+            📊 第 ${filtered.length} 車${hasTailTruck ? '（尾台）' : ''}出貨摘要
             <span style="margin-left:auto;font-size:0.7rem;background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8;padding:1px 6px;border-radius:8px;">👁️ 僅供查閱</span>
           </div>
           ${targetRow}
