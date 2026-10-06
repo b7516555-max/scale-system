@@ -1976,10 +1976,14 @@
           }
         }
 
-        // 依使用者需求：尾台符號可自主調選／取消／切換 (非尾台顯示＋設為尾台；已標記顯示🏁 尾台 ✕)
-        const tailBadge = isTail
-          ? `<button type="button" class="badge-tail-active" onclick="toggleTailTruck(${r.id})" title="已標記為尾台（點擊可取消標記）" style="cursor: pointer; background: #e53e3e; color: #fff; font-size: 0.72rem; padding: 2px 7px; border: none; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">🏁 尾台 ✕</button>`
-          : `<button type="button" class="btn-mark-tail" onclick="toggleTailTruck(${r.id})" title="點擊將此車設為「尾台」" style="font-size: 0.72rem; color: #718096; background: #edf2f7; border: 1px dashed #cbd5e0; padding: 1px 6px; border-radius: 8px; cursor: pointer; margin-left: 4px;">＋設為尾台</button>`;
+        // 依使用者需求：僅在最頂部的「最新一車（最後一台）」顯示尾台開關（可自主選定是否尾台，歷史車次不顯示干擾按鈕）
+        const isTopTruck = displayIdx === 0;
+        let tailBadge = '';
+        if (isTail) {
+          tailBadge = `<button type="button" class="badge-tail-active" onclick="toggleTailTruck(${r.id})" title="已標記為尾台（點擊取消標記）" style="cursor: pointer; background: #e53e3e; color: #fff; font-size: 0.72rem; padding: 2px 8px; border: none; border-radius: 10px; font-weight: 700; margin-left: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">🏁 尾台 ✕</button>`;
+        } else if (isTopTruck) {
+          tailBadge = `<button type="button" class="btn-mark-tail" onclick="toggleTailTruck(${r.id})" title="點擊將最後一台設為「尾台」" style="font-size: 0.72rem; color: #2b6cb0; background: #ebf8ff; border: 1px solid #bee3f8; padding: 2px 7px; border-radius: 10px; cursor: pointer; margin-left: 5px; font-weight: 600;">🏁 設為尾台</button>`;
+        }
 
         tr.innerHTML = `
           <td><input type="checkbox" class="row-select" data-id="${r.id}" data-truck-no="${item.truckNo}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
