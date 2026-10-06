@@ -1936,9 +1936,21 @@
         : currentRecords.filter(r => r.project === activeProject)
       ).filter(r => r.plate !== '__SET__');
 
+      // 1. 依實際出場順序正向計算各車的累計重量與車次序號 (第 1 車至第 N 車)
+      const listWithMeta = displayRecords.map((r, idx) => {
+        runningTotal += (Number(r.weight) || 0);
+        return {
+          record: r,
+          truckNo: idx + 1,
+          accumWeight: runningTotal
+        };
+      });
 
-      displayRecords.forEach((r, idx) => {
-        runningTotal += r.weight;
+      // 2. 依使用者需求：尾台顯示在最上方，由尾台至第一台方式排列 (反轉呈現)
+      const reversedList = [...listWithMeta].reverse();
+
+      reversedList.forEach((item, displayIdx) => {
+        const r = item.record;
         const tr = document.createElement("tr");
         if (editingDispatchId && Number(editingDispatchId) === Number(r.id)) {
           tr.className = "editing-highlight";
@@ -1954,15 +1966,21 @@
           cargoHtml = `<span style="display:inline-block; font-size:0.82rem; background:#fffaf0; color:#c05621; border:1px solid #fbd38d; padding:2px 8px; border-radius:12px; font-weight:700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">📦 ${cargoPart}</span>`;
         }
 
+        // 最上方的最新車次額外標註「尾台」徽章，醒目易辨識
+        const isTail = displayIdx === 0 && reversedList.length > 0;
+        const tailBadge = isTail
+          ? `<span style="font-size:0.75rem; background:#ebf8ff; color:#2b6cb0; border:1px solid #bee3f8; padding:1px 6px; border-radius:10px; font-weight:700; margin-left:4px;">尾台</span>`
+          : '';
+
         tr.innerHTML = `
-          <td><input type="checkbox" class="row-select" data-id="${r.id}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
-          <td>${idx + 1}</td>
+          <td><input type="checkbox" class="row-select" data-id="${r.id}" data-truck-no="${item.truckNo}" data-weight="${r.weight}" onchange="calculateSelected()"></td>
+          <td><b>${item.truckNo}</b>${tailBadge}</td>
           <td>${r.customer} / <b>${r.project}</b> / ${r.material}</td>
           <td><b>${driverName}</b></td>
           <td>${r.plate}</td>
           <td>${cargoHtml}</td>
-          <td>${r.weight.toLocaleString()}</td>
-          <td>${runningTotal.toLocaleString()}</td>
+          <td>${Number(r.weight).toLocaleString()}</td>
+          <td>${item.accumWeight.toLocaleString()}</td>
           <td>${r.exit_time}</td>
           <td style="text-align: center; white-space: nowrap;">
             <button class="edit-row-btn" onclick="editDispatchRecord(${r.id})">編輯</button>
@@ -1996,8 +2014,8 @@
       const to = parseInt(document.getElementById("toIndex").value, 10);
       if (isNaN(from) || isNaN(to) || from > to) return;
 
-      document.querySelectorAll(".row-select").forEach((cb, idx) => {
-        const rank = idx + 1;
+      document.querySelectorAll(".row-select").forEach((cb) => {
+        const rank = Number(cb.dataset.truckNo);
         cb.checked = rank >= from && rank <= to;
       });
       calculateSelected();
@@ -2130,7 +2148,7 @@
           ...payload,
           created_at: new Date().toISOString()
         };
-        currentRecords.unshift(optimisticRecord);
+        currentRecords.push(optimisticRecord);
 
         // 清空表單欄位供下一車輸入
         document.getElementById("driver").value = "";

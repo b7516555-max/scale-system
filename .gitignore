@@ -1,5 +1,7 @@
-﻿node_modules/
+node_modules/
 scale.db
 .DS_Store
 *.log
 deploy.js
+token.txt
+.env
