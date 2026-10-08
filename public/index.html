@@ -539,8 +539,11 @@
           </table>
         </div>
         <div id="mgrRemovedContainer" style="display:none; margin-top:15px; padding-top:12px; border-top:1px dashed #cbd5e0;">
-          <div style="font-size:0.85rem; font-weight:600; color:#718096; margin-bottom:6px;">📦 已封存／已移除的工程地點（點「恢復」即可重新加入頂部頁籤）：</div>
-          <div id="mgrRemovedList" style="display:flex; flex-wrap:wrap;"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <div style="font-size:0.85rem; font-weight:700; color:#718096;">📦 已封存／已移除的工程地點 (<span id="mgrRemovedCount">0</span> 個)：</div>
+            <button type="button" onclick="clearAllRemovedProjects()" style="background:#fff5f5; color:#c53030; border:1px solid #feb2b2; padding:3px 8px; border-radius:6px; font-size:0.75rem; cursor:pointer; font-weight:700;">🧹 全部徹底清空</button>
+          </div>
+          <div id="mgrRemovedList" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
         </div>
       </div>
     </div>
@@ -804,7 +807,10 @@
         const saved = localStorage.getItem(STORAGE_PROJECT_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const removed = getRemovedProjects();
+            return parsed.filter(p => p && p.name && !removed.has(p.name));
+          }
         }
       } catch (e) {
         console.error("載入自訂工程名單錯誤:", e);
@@ -813,7 +819,8 @@
     }
 
     function savePresetProjects(list) {
-      localStorage.setItem(STORAGE_PROJECT_KEY, JSON.stringify(list || presetProjects));
+      const targetList = list || presetProjects;
+      localStorage.setItem(STORAGE_PROJECT_KEY, JSON.stringify(targetList));
     }
 
     let presetProjects = loadPresetProjects();
@@ -842,6 +849,12 @@
     function renderProjectManagerTable() {
       const tbody = document.getElementById("mgrProjectTableBody");
       tbody.innerHTML = "";
+
+      const removedProjects = getRemovedProjects();
+
+      // 確保排除已封存/移除工程，保持管理建檔清單與頂部分頁 100% 同步連動
+      presetProjects = presetProjects.filter(p => p && p.name && !removedProjects.has(p.name));
+      savePresetProjects();
 
       // 匯總已出車數統計
       const countsMap = new Map();
@@ -885,19 +898,25 @@
         tbody.appendChild(tr);
       });
 
-      // 顯示已被封存/移除的工地名單，供使用者一鍵恢復
-      const removedProjects = getRemovedProjects();
+      // 顯示已被封存/移除的工地名單，支援一鍵恢復、個別永久刪除、全部清空
       const removedContainer = document.getElementById("mgrRemovedContainer");
       if (removedContainer) {
         if (removedProjects.size > 0) {
           removedContainer.style.display = "block";
+          const countEl = document.getElementById("mgrRemovedCount");
+          if (countEl) countEl.textContent = removedProjects.size;
           const listEl = document.getElementById("mgrRemovedList");
           listEl.innerHTML = "";
           removedProjects.forEach(pName => {
             const tag = document.createElement("span");
-            tag.style = "display:inline-flex; align-items:center; background:#edf2f7; border:1px solid #cbd5e0; padding:2px 8px; border-radius:6px; margin:4px 6px 4px 0; font-size:0.8rem; color:#4a5568;";
-            tag.innerHTML = `<span>🗑️ ${pName}</span><button type="button" style="margin-left:6px; background:none; border:none; color:#2b6cb0; cursor:pointer; font-weight:bold; font-size:0.8rem;" title="恢復此工地">↩️ 恢復</button>`;
-            tag.querySelector("button").onclick = () => restoreRemovedProject(pName);
+            tag.style = "display:inline-flex; align-items:center; background:#edf2f7; border:1px solid #cbd5e0; padding:3px 8px; border-radius:6px; font-size:0.8rem; color:#4a5568; gap:6px;";
+            tag.innerHTML = `
+              <span>🗑️ <b>${pName}</b></span>
+              <button type="button" class="btn-restore-project" style="background:#ebf8ff; border:1px solid #bee3f8; color:#2b6cb0; cursor:pointer; font-weight:bold; font-size:0.75rem; padding:2px 6px; border-radius:4px;" title="恢復此工地並加回清單">↩️ 恢復</button>
+              <button type="button" class="btn-purge-project" style="background:#fff5f5; border:1px solid #fed7d7; color:#e53e3e; cursor:pointer; font-weight:bold; font-size:0.75rem; padding:2px 6px; border-radius:4px;" title="徹底刪除此工地記錄">❌ 刪除</button>
+            `;
+            tag.querySelector(".btn-restore-project").onclick = () => restoreRemovedProject(pName);
+            tag.querySelector(".btn-purge-project").onclick = () => permanentlyDeleteRemovedProject(pName);
             listEl.appendChild(tag);
           });
         } else {
@@ -927,6 +946,62 @@
       renderProjectTabs();
       renderProjectManagerTable();
       renderTable();
+    }
+
+    async function permanentlyDeleteRemovedProject(pName) {
+      if (!pName) return;
+      if (!confirm(`確定要徹底刪除【${pName}】嗎？\n此工程名稱將完全從系統清除，不再出現於已封存名單。`)) return;
+
+      const removedProjects = getRemovedProjects();
+      removedProjects.delete(pName);
+      saveRemovedProjects(removedProjects, true);
+
+      // 徹底清除本地快取
+      localStorage.removeItem('scale_customer_' + pName);
+      localStorage.removeItem('scale_material_' + pName);
+      localStorage.removeItem('scale_target_' + pName);
+      localStorage.removeItem('scale_wait_phone_' + pName);
+
+      // 同步清理雲端 __SET__ 記錄
+      const setRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+      setRecords.forEach(r => {
+        if (window.ScaleApi) {
+          window.ScaleApi.postAction('deleteDispatch', { id: r.id }).catch(e => console.warn('刪除雲端設定記錄失敗:', e));
+        }
+      });
+      currentRecords = (currentRecords || []).filter(r => !(r.plate === '__SET__' && r.customer === pName));
+      saveCachedRecords(currentRecords);
+
+      updateKnownProjects();
+      renderProjectTabs();
+      renderProjectManagerTable();
+    }
+
+    async function clearAllRemovedProjects() {
+      const removedProjects = getRemovedProjects();
+      if (removedProjects.size === 0) return;
+      if (!confirm(`確定要清空所有已封存的工程地點嗎？（共 ${removedProjects.size} 個）\n清空後這些舊工程名稱將徹底抹除，畫面不再保留。`)) return;
+
+      const toPurge = Array.from(removedProjects);
+      removedProjects.clear();
+      saveRemovedProjects(removedProjects, true);
+
+      toPurge.forEach(pName => {
+        localStorage.removeItem('scale_customer_' + pName);
+        localStorage.removeItem('scale_material_' + pName);
+        localStorage.removeItem('scale_target_' + pName);
+        localStorage.removeItem('scale_wait_phone_' + pName);
+        const setRecords = (currentRecords || []).filter(r => r.plate === '__SET__' && r.customer === pName);
+        setRecords.forEach(r => {
+          if (window.ScaleApi) {
+            window.ScaleApi.postAction('deleteDispatch', { id: r.id }).catch(e => console.warn('刪除雲端設定記錄失敗:', e));
+          }
+        });
+        currentRecords = (currentRecords || []).filter(r => !(r.plate === '__SET__' && r.customer === pName));
+      });
+      saveCachedRecords(currentRecords);
+
+      renderProjectManagerTable();
     }
 
     function startEditProject(idx) {
@@ -1860,24 +1935,9 @@
           } catch(e) {}
         });
 
-        // 同時將已出車記錄中出現過的工程地點也納入預先建檔名單（若尚未建檔且未被使用者手動移除）
-        currentRecords.forEach(r => {
-          if (r.plate === '__SET__') return;
-          const pName = (r.project || '').trim();
-          if (pName && !removedProjects.has(pName)) {
-            let found = presetProjects.find(p => p.name === pName);
-            if (!found) {
-              presetProjects.push({
-                name: pName,
-                customer: r.customer || localStorage.getItem('scale_customer_' + pName) || "",
-                material: r.material || localStorage.getItem('scale_material_' + pName) || "",
-                target: getProjectTarget(pName) || 0,
-                wait: getProjectWaitPhone(pName) || ""
-              });
-              savePresetProjects();
-            }
-          }
-        });
+        // 確保 presetProjects 排除已被移除封存之工地，避免隔天或重新開啟時舊工地再次跑出來
+        presetProjects = presetProjects.filter(p => p && p.name && !removedProjects.has(p.name));
+        savePresetProjects();
 
         // 確保本地非移除的 presetProjects 都有同步至雲端 __SET__ 記錄，供 view.html 顯示
         presetProjects.forEach(p => {
@@ -2041,7 +2101,8 @@
     }
 
     async function toggleTailTruck(id) {
-      const rec = currentRecords.find(r => Number(r.id) === Number(id));
+      const targetIdNum = Number(id);
+      const rec = currentRecords.find(r => Number(r.id) === targetIdNum || (r.tempId && Number(r.tempId) === targetIdNum));
       if (!rec) return;
 
       const currentDriver = rec.driver != null ? String(rec.driver) : '';
@@ -2092,14 +2153,15 @@
     }
 
     function editDispatchRecord(id) {
-      const record = currentRecords.find(r => Number(r.id) === Number(id));
+      const targetIdNum = Number(id);
+      const record = currentRecords.find(r => Number(r.id) === targetIdNum || (r.tempId && Number(r.tempId) === targetIdNum));
       if (!record) {
         alert("找不到此車次紀錄！");
         return;
       }
 
-      editingDispatchId = id;
-      document.getElementById("editDispatchId").value = id;
+      editingDispatchId = record.id;
+      document.getElementById("editDispatchId").value = record.id;
       document.getElementById("customer").value = record.customer || "";
       document.getElementById("project").value = record.project || "";
       document.getElementById("material").value = record.material || "";
@@ -2238,6 +2300,7 @@
         const tempId = Date.now();
         const optimisticRecord = {
           id: tempId,
+          tempId: tempId,
           ...payload,
           created_at: new Date().toISOString()
         };
@@ -2299,11 +2362,20 @@
         } else {
           const res = await window.ScaleApi.postAction('addDispatch', payload);
           if (res && res.success && res.data) {
-            // 用雲端回傳的正式 ID 替換臨時 ID
-            const idx = currentRecords.findIndex(r => r.plate === payload.plate && r.weight === payload.weight);
+            // 用雲端回傳的正式 ID 替換臨時 ID，並保留 tempId
+            const idx = currentRecords.findIndex(r => r.tempId === tempId || Number(r.id) === Number(tempId));
             if (idx !== -1) {
               currentRecords[idx].id = res.data.id;
+              currentRecords[idx].tempId = tempId;
               saveCachedRecords(currentRecords);
+              // 即刻重新渲染表格，讓畫面上的「編輯」與「刪除」按鈕帶入正式 ID，不必重新整理即可直接編輯！
+              renderTable();
+            }
+            // 若使用者在背景同步完成前已點擊編輯此車次，同步更新表單中的 editingDispatchId
+            if (editingDispatchId && (editingDispatchId === tempId || Number(editingDispatchId) === Number(tempId))) {
+              editingDispatchId = res.data.id;
+              const editIdInput = document.getElementById("editDispatchId");
+              if (editIdInput) editIdInput.value = res.data.id;
             }
           }
         }
@@ -2325,9 +2397,13 @@
     async function deleteRecord(id) {
       if (!confirm("確定要刪除此筆出貨紀錄嗎？")) return;
 
+      const targetIdNum = Number(id);
+      const rec = currentRecords.find(r => Number(r.id) === targetIdNum || (r.tempId && Number(r.tempId) === targetIdNum));
+      const realId = rec ? rec.id : id;
+
       // 樂觀更新 (Optimistic UI)：畫面 0 秒立即移除與重新計算累計
       const originalRecords = [...currentRecords];
-      currentRecords = currentRecords.filter(r => Number(r.id) !== Number(id));
+      currentRecords = currentRecords.filter(r => !(Number(r.id) === targetIdNum || (r.tempId && Number(r.tempId) === targetIdNum)));
       saveCachedRecords(currentRecords);
       updateKnownProjects();
       renderProjectTabs();
@@ -2339,7 +2415,7 @@
 
       try {
         // 背景同步至 Google Apps Script 試算表
-        await window.ScaleApi.postAction('deleteDispatch', { id: id });
+        await window.ScaleApi.postAction('deleteDispatch', { id: realId });
         const visibleCount = currentRecords.filter(r => r.plate !== '__SET__').length;
         if (statusEl) statusEl.textContent = '連線正常 (共 ' + visibleCount + ' 筆)';
       } catch (err) {
