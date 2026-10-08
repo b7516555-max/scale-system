@@ -2284,6 +2284,7 @@
       }
 
       const targetEditingId = editingDispatchId; // 妥善保留欲編輯的 ID，避免被 cancelEditEntry 清空
+      let tempId = null;
 
       if (isEditing) {
         const targetIdx = currentRecords.findIndex(r => Number(r.id) === Number(targetEditingId));
@@ -2297,7 +2298,7 @@
         cancelEditEntry();
       } else {
         // 先給予暫時的臨時 ID，立即加入表格並清空表單，讓操作者能馬上記錄下一車
-        const tempId = Date.now();
+        tempId = Date.now();
         const optimisticRecord = {
           id: tempId,
           tempId: tempId,
