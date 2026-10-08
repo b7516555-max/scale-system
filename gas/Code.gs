@@ -114,10 +114,25 @@ function doPost(e) {
       if (lastRow <= 1) return createJsonResponse({ success: true, message: '無任何紀錄需刪除', deletedCount: 0, deletedIds: targetIds });
       const idTargetSet = {};
       targetIds.forEach(id => { idTargetSet[id] = true; });
-      const idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+      const numRows = lastRow - 1;
+      const numCols = sheet.getLastColumn() || 9;
+      const allRows = sheet.getRange(2, 1, numRows, numCols).getValues();
+      const remainingRows = [];
       let deletedCount = 0;
-      for (let i = idValues.length - 1; i >= 0; i--) {
-        if (idTargetSet[Number(idValues[i][0])]) { sheet.deleteRow(i + 2); deletedCount++; }
+
+      for (let i = 0; i < allRows.length; i++) {
+        const rowId = Number(allRows[i][0]);
+        if (idTargetSet[rowId]) {
+          deletedCount++;
+        } else {
+          remainingRows.push(allRows[i]);
+        }
+      }
+
+      sheet.getRange(2, 1, numRows, numCols).clearContent();
+      if (remainingRows.length > 0) {
+        sheet.getRange(2, 1, remainingRows.length, numCols).setValues(remainingRows);
       }
       return createJsonResponse({ success: true, message: `已成功刪除 ${deletedCount} 筆紀錄`, deletedCount, deletedIds: targetIds });
     }
