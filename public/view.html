@@ -313,25 +313,43 @@
       activeProject = decodeURIComponent(paramProject.trim());
     }
     const paramTarget = urlParams.get('target');
-    if (paramTarget && activeProject) {
+    if (paramTarget !== null && activeProject) {
       const parsedT = parseFloat(paramTarget);
-      if (parsedT > 0) {
+      if (!isNaN(parsedT) && parsedT > 0) {
         localStorage.setItem('scale_target_' + activeProject, parsedT);
+      } else {
+        localStorage.removeItem('scale_target_' + activeProject);
       }
     }
     const paramWait = urlParams.get('wait');
-    if (paramWait && activeProject) {
-      localStorage.setItem('scale_wait_phone_' + activeProject, decodeURIComponent(paramWait.trim()));
+    if (paramWait !== null && activeProject) {
+      const decodedWait = decodeURIComponent(paramWait.trim());
+      if (decodedWait) {
+        localStorage.setItem('scale_wait_phone_' + activeProject, decodedWait);
+      } else {
+        localStorage.removeItem('scale_wait_phone_' + activeProject);
+      }
     }
 
     function getProjectTarget(pName) {
       if (!pName) return 0;
       const clean = pName.trim();
-      if (projectSettingsMap[clean] && projectSettingsMap[clean].target > 0) {
-        return projectSettingsMap[clean].target;
+      // 1. 若 projectSettingsMap 中已有該工程設定，以最新雲端同步狀態為最高依據（若為 0 即代表未設定預計總量）
+      if (projectSettingsMap[clean] !== undefined) {
+        return Number(projectSettingsMap[clean].target) || 0;
       }
+      // 2. 僅在尚未載入雲端設定前之離線過渡期讀取本地快取
       const val = localStorage.getItem('scale_target_' + clean);
       return val ? parseFloat(val) : 0;
+    }
+
+    function getProjectWaitPhone(pName) {
+      if (!pName) return '';
+      const clean = pName.trim();
+      if (projectSettingsMap[clean] !== undefined) {
+        return String(projectSettingsMap[clean].wait || '').trim();
+      }
+      return localStorage.getItem('scale_wait_phone_' + clean) || '';
     }
 
 
@@ -407,14 +425,7 @@
       }
     }
 
-    function getProjectWaitPhone(pName) {
-      if (!pName) return '';
-      const clean = pName.trim();
-      if (projectSettingsMap[clean] && projectSettingsMap[clean].wait) {
-        return projectSettingsMap[clean].wait;
-      }
-      return localStorage.getItem('scale_wait_phone_' + clean) || '';
-    }
+
 
 
     // 輔助：更新同步狀態標籤
@@ -463,12 +474,24 @@
                 const pName = (r.customer || '').trim();
                 if (!pName || pName === '__PROJECT_CONFIG__') return;
                 const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+                const tNum = Number(cfg.target) || 0;
+                const wStr = String(cfg.wait || '').trim();
                 projectSettingsMap[pName] = {
-                  target: Number(cfg.target) || 0,
-                  wait: String(cfg.wait || '').trim(),
+                  target: tNum,
+                  wait: wStr,
                   customer: cfg.customer || '',
                   material: cfg.material || ''
                 };
+                if (tNum > 0) {
+                  localStorage.setItem('scale_target_' + pName, tNum);
+                } else {
+                  localStorage.removeItem('scale_target_' + pName);
+                }
+                if (wStr) {
+                  localStorage.setItem('scale_wait_phone_' + pName, wStr);
+                } else {
+                  localStorage.removeItem('scale_wait_phone_' + pName);
+                }
               } catch(e) {}
             });
             dispatches = list.filter(r => r.plate !== '__SET__');
@@ -503,14 +526,24 @@
             const pName = (r.customer || '').trim();
             if (!pName || pName === '__PROJECT_CONFIG__') return;
             const cfg = typeof r.material === 'string' ? JSON.parse(r.material || '{}') : (r.material || {});
+            const tNum = Number(cfg.target) || 0;
+            const wStr = String(cfg.wait || '').trim();
             projectSettingsMap[pName] = {
-              target: Number(cfg.target) || 0,
-              wait: String(cfg.wait || '').trim(),
+              target: tNum,
+              wait: wStr,
               customer: cfg.customer || '',
               material: cfg.material || ''
             };
-            if (cfg.target > 0) localStorage.setItem('scale_target_' + pName, cfg.target);
-            if (cfg.wait) localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
+            if (tNum > 0) {
+              localStorage.setItem('scale_target_' + pName, tNum);
+            } else {
+              localStorage.removeItem('scale_target_' + pName);
+            }
+            if (wStr) {
+              localStorage.setItem('scale_wait_phone_' + pName, wStr);
+            } else {
+              localStorage.removeItem('scale_wait_phone_' + pName);
+            }
             if (cfg.customer) localStorage.setItem('scale_customer_' + pName, cfg.customer);
             if (cfg.material) localStorage.setItem('scale_material_' + pName, cfg.material);
           } catch(e) {

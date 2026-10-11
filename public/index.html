@@ -1640,7 +1640,7 @@
       const totalKg = siteRecords.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
       const currentTon = totalKg / 1000;
 
-      if (!isNaN(num) && num >= 0) {
+      if (!isNaN(num) && num > 0) {
         localStorage.setItem('scale_target_' + activeProject, num);
         // 同步更新「還要出」欄位（若使用者當前未在還要出欄位打字）
         if (remainingInput && document.activeElement !== remainingInput) {
@@ -1904,12 +1904,12 @@
             if (!pendingSyncProjects.has(pName)) {
               if (cfg.target > 0) {
                 localStorage.setItem('scale_target_' + pName, cfg.target);
-              } else if (cfg.target === 0 && !localStorage.getItem('scale_target_' + pName)) {
-                // 保持乾淨
+              } else {
+                localStorage.removeItem('scale_target_' + pName);
               }
               if (cfg.wait) {
                 localStorage.setItem('scale_wait_phone_' + pName, cfg.wait);
-              } else if (!cfg.wait && !localStorage.getItem('scale_wait_phone_' + pName)) {
+              } else {
                 localStorage.removeItem('scale_wait_phone_' + pName);
               }
             }
@@ -1921,14 +1921,16 @@
                 name: pName,
                 customer: cfg.customer || localStorage.getItem('scale_customer_' + pName) || "",
                 material: cfg.material || localStorage.getItem('scale_material_' + pName) || "",
-                target: cfg.target || 0,
+                target: Number(cfg.target) || 0,
                 wait: cfg.wait || ""
               };
               presetProjects.push(found);
               savePresetProjects();
             } else {
-              if (cfg.target > 0) found.target = cfg.target;
-              if (cfg.wait) found.wait = cfg.wait;
+              if (!pendingSyncProjects.has(pName)) {
+                found.target = Number(cfg.target) || 0;
+                found.wait = cfg.wait || "";
+              }
               if (cfg.customer && !found.customer) found.customer = cfg.customer;
               if (cfg.material && !found.material) found.material = cfg.material;
             }
