@@ -261,21 +261,26 @@
   </div>
 
   <div class="tool-panel">
-    <div class="tool-row">
-      <span>車次：第</span>
-      <input type="number" id="rangeFrom" class="range-num" inputmode="numeric" placeholder="1">
-      <span>車 至 第</span>
-      <input type="number" id="rangeTo" class="range-num" inputmode="numeric" placeholder="7">
-      <span>車</span>
+    <div class="tool-row" style="margin-bottom: 7px;">
+      <span style="font-weight: 700; color: #2d3748; white-space: nowrap;">🎯 車次快速選取：</span>
+      <input type="text" id="truckOrderInput" class="search-input" placeholder="可填 16.17.18.1.2.3 或 1-3, 16-18">
     </div>
-    <div class="tool-row">
-      <span style="font-size: 0.85rem;">車牌篩選：</span>
-      <input type="text" id="plateFilter" class="search-input" placeholder="輸入數字4碼 (如 0931)" oninput="filterCards()">
+    <div class="tool-row" style="margin-bottom: 7px;">
+      <span style="color: #4a5568; white-space: nowrap;">或區間：第</span>
+      <input type="number" id="rangeFrom" class="range-num" inputmode="numeric" placeholder="1">
+      <span style="color: #4a5568;">車 至 第</span>
+      <input type="number" id="rangeTo" class="range-num" inputmode="numeric" placeholder="18">
+      <span style="color: #4a5568;">車</span>
+    </div>
+    <div class="tool-row" style="margin-bottom: 9px;">
+      <span style="font-size: 0.85rem; color: #4a5568; white-space: nowrap;">車牌搜尋：</span>
+      <input type="text" id="plateFilter" class="search-input" placeholder="輸入數字4碼或車牌 (如 083)" oninput="filterCards()">
     </div>
     <div class="btn-group">
-      <button class="btn btn-apply" onclick="selectRange()">套用區間</button>
+      <button class="btn btn-apply" onclick="applyCarSelection(false)" title="選取指定車次">套用選取</button>
+      <button class="btn btn-apply" style="background: #2b6cb0;" onclick="applyCarSelection(true)" title="保留現有勾選，累加新選取的車次">＋加選車次</button>
       <button class="btn btn-neutral" onclick="setSelectAll(true)">全部勾選</button>
-      <button class="btn btn-neutral" onclick="setSelectAll(false)">取消勾選</button>
+      <button class="btn btn-neutral" onclick="setSelectAll(false)">清除勾選</button>
     </div>
   </div>
 
@@ -654,6 +659,18 @@
       }
       fetchData();
       startAutoPolling();
+
+      ['truckOrderInput', 'rangeFrom', 'rangeTo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              applyCarSelection(false);
+            }
+          });
+        }
+      });
     }
 
     function updateProjectCounts() {
@@ -704,14 +721,33 @@
       });
     }
 
+    let lastRenderedProject = null;
     function switchMobileTab(pName) {
+      if (activeProject !== pName) {
+        const orderInput = document.getElementById('truckOrderInput');
+        if (orderInput) orderInput.value = '';
+        const rf = document.getElementById('rangeFrom');
+        if (rf) rf.value = '';
+        const rt = document.getElementById('rangeTo');
+        if (rt) rt.value = '';
+      }
       activeProject = pName;
       renderProjectTabs();
-      renderList();
+      renderList(true);
     }
 
-    function renderList() {
+    function renderList(resetSelection = false) {
       const container = document.getElementById('truckList');
+      // 保持使用者目前已勾選的車輛狀態 (依 dispatches 的唯一 id，或車次序號)
+      const selectedIdSet = new Set();
+      if (!resetSelection && lastRenderedProject === activeProject) {
+        document.querySelectorAll('.car-check:checked').forEach(cb => {
+          if (cb.dataset.id) selectedIdSet.add(String(cb.dataset.id));
+          else if (cb.dataset.index !== undefined) selectedIdSet.add(String(cb.dataset.index));
+        });
+      }
+      lastRenderedProject = activeProject;
+
       container.innerHTML = '';
       let totalAllKg = 0;
 
@@ -745,13 +781,16 @@
 
       filtered.forEach((item, index) => {
         totalAllKg += item.weight;
+        const isSelected = (item.id && selectedIdSet.has(String(item.id))) || selectedIdSet.has(String(index));
         const card = document.createElement('div');
-        card.className = 'truck-card';
+        card.className = 'truck-card' + (isSelected ? ' selected' : '');
         card.id = `card-${index}`;
 
-        card.onclick = () => {
+        card.onclick = (e) => {
           const cb = card.querySelector('input[type="checkbox"]');
-          cb.checked = !cb.checked;
+          if (e.target !== cb) {
+            cb.checked = !cb.checked;
+          }
           updateCardStyle(card, cb.checked);
           calculate();
         };
@@ -776,7 +815,7 @@
           : '';
 
         card.innerHTML = `
-          <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}">
+          <input type="checkbox" class="car-check" data-weight="${item.weight}" data-index="${index}" data-id="${item.id || ''}" ${isSelected ? 'checked' : ''}>
           <div class="truck-info">
             <div class="truck-head">
               <span class="truck-no">第 ${index + 1} 車${tailBadgeHtml}</span>
@@ -888,37 +927,134 @@
       document.getElementById('selectedCount').textContent = `(${count} 輛)`;
     }
 
-    function selectRange() {
-      const from = parseInt(document.getElementById('rangeFrom').value, 10);
-      const to = parseInt(document.getElementById('rangeTo').value, 10);
-      if (isNaN(from) || isNaN(to) || from > to) return;
+    // 解析彈性車次字串（支援 16.17.18.1.2.3 或 1-3, 16-18 或 16,17,18,1,2,3 等任意多格式）
+    function parseTruckOrders(inputStr, totalCount) {
+      if (!inputStr) return new Set();
+      const result = new Set();
+      const tokens = inputStr.replace(/[,，;；\s\+]+/g, ' ').trim().split(' ');
+      tokens.forEach(token => {
+        token = token.trim();
+        if (!token) return;
 
-      document.querySelectorAll('.car-check').forEach((cb, idx) => {
-        const order = idx + 1;
-        const shouldCheck = order >= from && order <= to;
-        cb.checked = shouldCheck;
-        updateCardStyle(document.getElementById(`card-${idx}`), shouldCheck);
+        // 支援區間格式，例如 1-3, 1~3, 16-18
+        const rangeMatch = token.match(/^(\d+)[\-~～至到](\d+)$/);
+        if (rangeMatch) {
+          let a = parseInt(rangeMatch[1], 10);
+          let b = parseInt(rangeMatch[2], 10);
+          let start = Math.min(a, b);
+          let end = Math.max(a, b);
+          for (let i = start; i <= end; i++) {
+            if (i >= 1 && (!totalCount || i <= totalCount)) result.add(i);
+          }
+          return;
+        }
+
+        // 支援以點號分隔之車次序號（例如 16.17.18.1.2.3 或 1.2.3）
+        if (token.includes('.')) {
+          const parts = token.split('.');
+          parts.forEach(p => {
+            const num = parseInt(p.trim(), 10);
+            if (!isNaN(num) && num >= 1 && (!totalCount || num <= totalCount)) {
+              result.add(num);
+            }
+          });
+          return;
+        }
+
+        // 單一車次
+        const num = parseInt(token, 10);
+        if (!isNaN(num) && num >= 1 && (!totalCount || num <= totalCount)) {
+          result.add(num);
+        }
       });
+      return result;
+    }
+
+    // 套用或累加選取車次
+    function applyCarSelection(isAppend = false) {
+      const orderInput = document.getElementById('truckOrderInput');
+      const textVal = orderInput ? orderInput.value.trim() : '';
+      const fromVal = parseInt(document.getElementById('rangeFrom').value, 10);
+      const toVal = parseInt(document.getElementById('rangeTo').value, 10);
+
+      const checkboxes = document.querySelectorAll('.car-check');
+      const totalCount = checkboxes.length;
+      if (totalCount === 0) return;
+
+      let targetOrders = new Set();
+
+      if (textVal) {
+        // 優先依車次快速選取欄位解析
+        targetOrders = parseTruckOrders(textVal, totalCount);
+      } else if (!isNaN(fromVal) || !isNaN(toVal)) {
+        // 從區間欄位解析
+        const from = !isNaN(fromVal) ? fromVal : 1;
+        const to = !isNaN(toVal) ? toVal : totalCount;
+
+        if (from <= to) {
+          for (let i = from; i <= to; i++) {
+            if (i >= 1 && i <= totalCount) targetOrders.add(i);
+          }
+        } else {
+          // 支援跨趟/環形車次選取（例如 第 16 車 至 第 3 車，自動選取 16~最後一車 以及 1~3 車）
+          for (let i = 1; i <= totalCount; i++) {
+            if (i >= from || i <= to) targetOrders.add(i);
+          }
+        }
+      }
+
+      checkboxes.forEach((cb, idx) => {
+        const order = idx + 1;
+        const card = document.getElementById(`card-${idx}`);
+        if (!card) return;
+
+        let shouldCheck = false;
+        if (targetOrders.has(order)) {
+          shouldCheck = true;
+        } else if (isAppend && cb.checked) {
+          // 累加模式保留現有已勾選項目
+          shouldCheck = true;
+        }
+
+        cb.checked = shouldCheck;
+        updateCardStyle(card, shouldCheck);
+      });
+
       calculate();
+    }
+
+    function selectRange() {
+      applyCarSelection(false);
     }
 
     function setSelectAll(status) {
       document.querySelectorAll('.car-check').forEach((cb, idx) => {
         const card = document.getElementById(`card-${idx}`);
-        if (card.style.display !== 'none') {
+        if (card && card.style.display !== 'none') {
           cb.checked = status;
           updateCardStyle(card, status);
         }
       });
+      if (!status) {
+        const orderInput = document.getElementById('truckOrderInput');
+        if (orderInput) orderInput.value = '';
+        const rf = document.getElementById('rangeFrom');
+        if (rf) rf.value = '';
+        const rt = document.getElementById('rangeTo');
+        if (rt) rt.value = '';
+      }
       calculate();
     }
 
     function filterCards() {
       const keyword = document.getElementById('plateFilter').value.trim().toUpperCase();
-      dispatches.forEach((item, idx) => {
-        const card = document.getElementById(`card-${idx}`);
-        const plateClean = item.plate.replace('-', '').toUpperCase();
-        const matches = plateClean.includes(keyword) || item.plate.toUpperCase().includes(keyword);
+      const cards = document.querySelectorAll('.truck-card');
+      cards.forEach(card => {
+        const plateEl = card.querySelector('.truck-plate');
+        if (!plateEl) return;
+        const plateText = plateEl.textContent.trim().toUpperCase();
+        const plateClean = plateText.replace('-', '');
+        const matches = !keyword || plateClean.includes(keyword) || plateText.includes(keyword);
         card.style.display = matches ? 'flex' : 'none';
       });
     }
